@@ -16,6 +16,8 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+import traceback
+
 import pandas as pd
 
 # custom code imports
@@ -25,8 +27,10 @@ from neuron_coverage import *
 from inception_score import *
 from fid_score import *
 
+use_cuda = False
 device = torch.device("cpu")
 if torch.cuda.is_available():
+    use_cuda = True
     device = torch.device("cuda")
 
 data_dir = "C:\data\CIFAR10"
@@ -54,7 +58,7 @@ classes = ['plane', 'car', 'bird', 'cat', 'deer',
 from resnet import *
 
 models_dir = 'pretrained_models/cifar10/' 
-model = resnet56().cuda()
+model = resnet56().to(device)
 state_dict = torch.load(models_dir + 'resnet56.th', map_location='cuda')['state_dict'] # best_prec1, state_dict
 
 new_state_dict = {}
@@ -100,7 +104,7 @@ def main():
 
     n=11
     attack_versions = [cw_div4_attack] # [cw_div1_attack, cw_div2_attack, cw_div3_attack, cw_div4_attack]
-    target_layers = list(layer_dict)[0::n]
+    target_layers = [list(layer_dict)[55]] # list(layer_dict)[0::n]
     reg_weights = [0, 1, 10, 100, 1000, 10000]
     confidences = [0, 5, 10] # [15, 20, 25] # [0, 20, 40]
 
@@ -108,21 +112,18 @@ def main():
     nc_thresholds = 0. # all activations are scaled to (0,1) after relu
 
     # inception score (is) params
-    is_cuda = True
+    is_cuda = use_cuda
     is_batch_size = 10
     is_resize = True
     is_splits = 10
 
     # fréchet inception distance score (fid) params
     fid_batch_size = 64
-    fid_cuda = True
-    real_path = "C:/temp_imgs/cifar/real/"
-    fake_path = "C:/temp_imgs/cifar/fake/"
+    fid_cuda = use_cuda
+    real_path = "C:/temp_imgs/cifar/real_2019.08.15/"
+    fake_path = "C:/temp_imgs/cifar/fake_2019.08.15/"
 
-    if not os.path.exists(save_file_path):
-        os.makedirs(save_file_path)
-
-    with open('error_log_2019.08.15.txt', 'w') as error_log: 
+    with open('logs/error_log_2019.08.15.txt', 'w') as error_log: 
 
         for attack in attack_versions:
             for layer_idx in target_layers:
@@ -205,11 +206,13 @@ def main():
                             results.append(out)
                             
                             # save incremental outputs
-                            pickle.dump(results, open(save_file_path, "wb"))
+                            with open(save_file_path, 'wb') as handle:
+                                pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
                         except Exception as e: 
 
-                            error_log.write("Failed on attack_detail {0}: {1}\n".format(str(attack_detail), str(e)))
+                            print(str(traceback.format_exc()))
+                            error_log.write("Failed on attack_detail {0}: {1}\n".format(str(attack_detail), str(traceback.format_exc())))
 
                         finally:
 
@@ -223,4 +226,9 @@ def main():
 # df[target_features]
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e: 
+        print(traceback.format_exc())
+    # finally:
+    #     files.download(save_file_path)

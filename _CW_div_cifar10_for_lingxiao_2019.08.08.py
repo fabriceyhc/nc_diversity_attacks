@@ -16,6 +16,10 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+import traceback
+
+# from google.colab import files
+
 import pandas as pd
 
 # custom code imports
@@ -116,13 +120,10 @@ def main():
     # fréchet inception distance score (fid) params
     fid_batch_size = 64
     fid_cuda = True
-    real_path = "C:/temp_imgs/cifar/real/"
-    fake_path = "C:/temp_imgs/cifar/fake/"
+    real_path = "C:/temp_imgs/cifar/real_2019.08.08/"
+    fake_path = "C:/temp_imgs/cifar/fake_2019.08.08/"
 
-    if not os.path.exists(save_file_path):
-        os.makedirs(save_file_path)
-
-    with open('error_log_2019.08.08.txt', 'w') as error_log: 
+    with open('logs/error_log_2019.08.08.txt', 'w') as error_log: 
 
         for attack in attack_versions:
             for layer_idx in target_layers:
@@ -196,11 +197,13 @@ def main():
                             results.append(out)
                             
                             # save incremental outputs
-                            pickle.dump(results, open(save_file_path, "wb"))
+                            with open(save_file_path, 'wb') as handle:
+                                pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
                         except Exception as e: 
 
-                            error_log.write("Failed on attack_detail {0}: {1}\n".format(str(attack_detail), str(e)))
+                            print(str(traceback.format_exc()))
+                            error_log.write("Failed on attack_detail {0}: {1}\n".format(str(attack_detail), str(traceback.format_exc())))
 
                         finally:
 
@@ -213,4 +216,9 @@ def main():
 # df[target_features]
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e: 
+        print(traceback.format_exc())
+    # finally:
+    #     files.download(save_file_path)

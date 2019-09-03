@@ -2,10 +2,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.data.sampler import SubsetRandomSampler
 
 import numpy as np
 
 import matplotlib.pyplot as plt
+
+import faulthandler
+faulthandler.enable()
+
+# provides a nice UI element when running in a notebook, otherwise use "import tqdm" only
+from tqdm import tqdm_notebook as tqdm
+# from tqdm import tqdm
 
 def cw_attack(model, inputs, targets, device, targeted=False, norm_type='inf',  
               epsilon=100., confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, 
@@ -20,17 +28,17 @@ def cw_attack(model, inputs, targets, device, targeted=False, norm_type='inf',
     # `lower_bounds`, `upper_bounds` and `scale_consts` are used
     # for binary search of each `scale_const` in the batch. The element-wise
     # inquality holds: lower_bounds < scale_consts <= upper_bounds
-    lower_bounds = torch.tensor(np.zeros(batch_size), dtype=torch.float, device=device)
-    upper_bounds = torch.tensor(np.ones(batch_size) * c_range[1], dtype=torch.float, device=device)
-    scale_consts = torch.tensor(np.ones(batch_size) * c_range[0], dtype=torch.float, device=device)
+    lower_bounds = torch.tensor(torch.zeros(batch_size), dtype=torch.float, device=device)
+    upper_bounds = torch.tensor(torch.ones(batch_size) * c_range[1], dtype=torch.float, device=device)
+    scale_consts = torch.tensor(torch.ones(batch_size) * c_range[0], dtype=torch.float, device=device)
 
     # Optimal attack to be found.
     # The three "placeholders" are defined as:
     # - `o_best_norm`        : the smallest norms encountered so far
     # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
     # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
-    o_best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
-    o_best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+    o_best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
+    o_best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
     o_best_adversaries = inputs.clone()
 
     # convert `inputs` to tanh-space
@@ -47,13 +55,13 @@ def cw_attack(model, inputs, targets, device, targeted=False, norm_type='inf',
         print('Step', const_step)
 
         # the minimum norms of perturbations found during optimization
-        best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
+        best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
 
         # the perturbed predictions made by the adversarial perturbations with the smallest norms
-        best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+        best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
 
         # previous (summed) batch loss, to be used in early stopping policy
-        prev_batch_loss = torch.tensor(np.inf, device=device)
+        prev_batch_loss = torch.tensor(1e10, device=device)
 
         # optimization steps
         for optim_step in range(max_steps):
@@ -147,7 +155,7 @@ def cw_attack(model, inputs, targets, device, targeted=False, norm_type='inf',
                     
     return o_best_adversaries
 
-def cw_div1_attack(model, module, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100.,
+def cw_div1_attack(model, modules, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100.,
                    confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, max_steps=1000, 
                    abort_early=True, box=(-1., 1.), optimizer_lr=1e-2, 
                    init_rand=False, log_frequency=10):
@@ -158,17 +166,17 @@ def cw_div1_attack(model, module, regularizer_weight, inputs, targets, device, t
     # `lower_bounds`, `upper_bounds` and `scale_consts` are used
     # for binary search of each `scale_const` in the batch. The element-wise
     # inquality holds: lower_bounds < scale_consts <= upper_bounds
-    lower_bounds = torch.tensor(np.zeros(batch_size), dtype=torch.float, device=device)
-    upper_bounds = torch.tensor(np.ones(batch_size) * c_range[1], dtype=torch.float, device=device)
-    scale_consts = torch.tensor(np.ones(batch_size) * c_range[0], dtype=torch.float, device=device)
+    lower_bounds = torch.tensor(torch.zeros(batch_size), dtype=torch.float, device=device)
+    upper_bounds = torch.tensor(torch.ones(batch_size) * c_range[1], dtype=torch.float, device=device)
+    scale_consts = torch.tensor(torch.ones(batch_size) * c_range[0], dtype=torch.float, device=device)
 
     # Optimal attack to be found.
     # The three "placeholders" are defined as:
     # - `o_best_norm`        : the smallest norms encountered so far
     # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
     # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
-    o_best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
-    o_best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+    o_best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
+    o_best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
     o_best_adversaries = inputs.clone()
 
     # convert `inputs` to tanh-space
@@ -185,13 +193,13 @@ def cw_div1_attack(model, module, regularizer_weight, inputs, targets, device, t
         print('Step', const_step)
 
         # the minimum norms of perturbations found during optimization
-        best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
+        best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
 
         # the perturbed predictions made by the adversarial perturbations with the smallest norms
-        best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+        best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
 
         # previous (summed) batch loss, to be used in early stopping policy
-        prev_batch_loss = torch.tensor(np.inf, device=device)
+        prev_batch_loss = torch.tensor(1e10, device=device)
         ae_tol = torch.tensor(1e-4, device=device)
 
         # optimization steps
@@ -213,11 +221,11 @@ def cw_div1_attack(model, module, regularizer_weight, inputs, targets, device, t
             # calculate kl divergence for each input to use for adversary selection
             divs = []
             for i in range(batch_size):
-                divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, module=module, device=device, regularizer_weight=regularizer_weight)) 
+                divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)) 
             div_norms = torch.tensor(torch.stack(divs), device=device)
             
             # calculate kl divergence for batch to use in loss function
-            div_reg = norm_divergence_by_module(data=adversaries, model=model, module=module, device=device, regularizer_weight=regularizer_weight)
+            div_reg = norm_divergence_by_module(data=adversaries, model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)
 
             target_activ = torch.sum(targets_oh * pert_outputs, 1)
             maxother_activ = torch.max(((1 - targets_oh) * pert_outputs - targets_oh * 1e4), 1)[0]
@@ -296,7 +304,7 @@ def cw_div1_attack(model, module, regularizer_weight, inputs, targets, device, t
                     
     return o_best_adversaries #, norms
 
-def cw_div2_attack(model, module, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100.,
+def cw_div2_attack(model, modules, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100.,
                    confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, max_steps=1000, 
                    abort_early=True, box=(-1., 1.), optimizer_lr=1e-2, 
                    init_rand=False, log_frequency=10):
@@ -309,8 +317,8 @@ def cw_div2_attack(model, module, regularizer_weight, inputs, targets, device, t
     # - `o_best_norm`        : the smallest norms encountered so far
     # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
     # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
-    o_best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
-    o_best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+    o_best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
+    o_best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
     o_best_adversaries = inputs.clone()
 
     # convert `inputs` to tanh-space
@@ -323,7 +331,7 @@ def cw_div2_attack(model, module, regularizer_weight, inputs, targets, device, t
     optimizer = optim.Adam([pert_tanh], lr=optimizer_lr)
 
     # previous (summed) batch loss, to be used in early stopping policy
-    prev_batch_loss = torch.tensor(np.inf, device=device)
+    prev_batch_loss = torch.tensor(1e10, device=device)
     ae_tol = torch.tensor(1e-4, device=device)
 
     # optimization steps
@@ -345,11 +353,11 @@ def cw_div2_attack(model, module, regularizer_weight, inputs, targets, device, t
         # calculate kl divergence for each input to use for adversary selection
         divs = []
         for i in range(batch_size):
-            divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, module=module, device=device, regularizer_weight=regularizer_weight)) 
+            divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)) 
         div_norms = torch.tensor(torch.stack(divs), device=device)
 
         # calculate kl divergence for batch to use in loss function
-        div_reg = norm_divergence_by_module(data=adversaries, model=model, module=module, device=device, regularizer_weight=regularizer_weight)
+        div_reg = norm_divergence_by_module(data=adversaries, model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)
 
         target_activ = torch.sum(targets_oh * pert_outputs, 1)
         maxother_activ = torch.max(((1 - targets_oh) * pert_outputs - targets_oh * 1e4), 1)[0]
@@ -403,7 +411,7 @@ def cw_div2_attack(model, module, regularizer_weight, inputs, targets, device, t
                     
     return o_best_adversaries #, norms
 
-def cw_div3_attack(model, module, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100., 
+def cw_div3_attack(model, modules, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100., 
                    confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, max_steps=1000, 
                    abort_early=True, box=(-1., 1.), optimizer_lr=1e-2, 
                    init_rand=False, log_frequency=10):
@@ -416,8 +424,8 @@ def cw_div3_attack(model, module, regularizer_weight, inputs, targets, device, t
     # - `o_best_norm`        : the smallest norms encountered so far
     # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
     # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
-    o_best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
-    o_best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+    o_best_norm = torch.tensor(torch.ones(batch_size) * 1e10, dtype=torch.float, device=device)
+    o_best_norm_ppred = torch.tensor(-torch.ones(batch_size), dtype=torch.float, device=device)
     o_best_adversaries = inputs.clone()
 
     # convert `inputs` to tanh-space
@@ -430,7 +438,7 @@ def cw_div3_attack(model, module, regularizer_weight, inputs, targets, device, t
     optimizer = optim.Adam([pert_tanh], lr=optimizer_lr)
 
     # previous (summed) batch loss, to be used in early stopping policy
-    prev_batch_loss = torch.tensor(np.inf, device=device)
+    prev_batch_loss = torch.tensor(1e10, device=device)
     ae_tol = torch.tensor(1e-4, device=device)
 
     # optimization steps
@@ -452,11 +460,11 @@ def cw_div3_attack(model, module, regularizer_weight, inputs, targets, device, t
         # calculate kl divergence for each input to use for adversary selection
         divs = []
         for i in range(batch_size):
-            divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, module=module, device=device, regularizer_weight=regularizer_weight)) 
+            divs.append(norm_divergence_by_module(data=adversaries[i].unsqueeze(0), model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)) 
         div_norms = torch.tensor(torch.stack(divs), device=device)
 
         # calculate kl divergence for batch to use in loss function
-        div_reg = norm_divergence_by_module(data=adversaries, model=model, module=module, device=device, regularizer_weight=regularizer_weight)
+        div_reg = norm_divergence_by_module(data=adversaries, model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)
 
         loss = -1. * nn.CrossEntropyLoss()(pert_outputs, targets)
 
@@ -502,28 +510,33 @@ def cw_div3_attack(model, module, regularizer_weight, inputs, targets, device, t
                     
     return o_best_adversaries #, norms
 
-def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100., 
+def cw_div4_attack(model, modules, regularizer_weight, inputs, targets, device, targeted=False, norm_type='inf', epsilon=100., 
                    confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, max_steps=1000, 
                    abort_early=True, box=(-1., 1.), optimizer_lr=1e-2, 
                    init_rand=False, log_frequency=10):
 
+    inputs = inputs.to(device)
+    targets = targets.to(device)
+    model.to(device)
+
     batch_size = inputs.size(0)
-    num_classes = model(torch.tensor(inputs[0][None,:], requires_grad=False)).size(1)
+    with torch.no_grad():
+        num_classes = model(inputs[0].unsqueeze(0)).size(1)
 
     # `lower_bounds`, `upper_bounds` and `scale_consts` are used
     # for binary search of each `scale_const` in the batch. The element-wise
     # inquality holds: lower_bounds < scale_consts <= upper_bounds
-    lower_bounds = torch.tensor(np.zeros(batch_size), dtype=torch.float, device=device)
-    upper_bounds = torch.tensor(np.ones(batch_size) * c_range[1], dtype=torch.float, device=device)
-    scale_consts = torch.tensor(np.ones(batch_size) * c_range[0], dtype=torch.float, device=device)
+    lower_bounds = torch.zeros(batch_size).to(device) 
+    upper_bounds = torch.ones(batch_size).to(device) * c_range[1]
+    scale_consts = torch.ones(batch_size).to(device) * c_range[0]
 
     # Optimal attack to be found.
     # The three "placeholders" are defined as:
     # - `o_best_norm`        : the smallest norms encountered so far
     # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
     # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
-    o_best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
-    o_best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+    o_best_norm = torch.ones(batch_size).to(device) * 1e10
+    o_best_norm_ppred = torch.ones(batch_size).to(device) * -1.
     o_best_adversaries = inputs.clone()
 
     # convert `inputs` to tanh-space
@@ -539,18 +552,18 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
 
         print('Step', const_step)
 
-        # the minimum norms of perturbations found during optimization
-        best_norm = torch.tensor(np.ones(batch_size) * np.inf, dtype=torch.float, device=device)
+        # # the minimum norms of perturbations found during optimization
+        # best_norm = torch.ones(batch_size).to(device) * 1e10
 
-        # the perturbed predictions made by the adversarial perturbations with the smallest norms
-        best_norm_ppred = torch.tensor(-np.ones(batch_size), dtype=torch.float, device=device)
+        # # the perturbed predictions made by the adversarial perturbations with the smallest norms
+        # best_norm_ppred = torch.ones(batch_size).to(device)  * -1.
 
         # previous (summed) batch loss, to be used in early stopping policy
-        prev_batch_loss = torch.tensor(np.inf, device=device)
-        ae_tol = torch.tensor(1e-4, device=device) # abort early tolerance
+        prev_batch_loss = torch.tensor(1e10).to(device)
+        ae_tol = torch.tensor(1e-4).to(device) # abort early tolerance
 
         # optimization steps
-        for optim_step in range(max_steps):
+        for optim_step in tqdm(range(max_steps)):
 
             adversaries = from_tanh_space(inputs_tanh + pert_tanh)
             pert_outputs = model(adversaries)
@@ -566,7 +579,9 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
                 raise Exception('must provide a valid norm_type for epsilon distance constraint: inf, l2') 
             
             # calculate kl divergence for batch to use in loss function
-            div_reg = norm_divergence_by_module(data=adversaries, model=model, module=module, device=device, regularizer_weight=regularizer_weight)
+            div_reg = 0
+            if regularizer_weight > 0:
+                div_reg = norm_divergence_by_module(data=adversaries, model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)
 
             target_activ = torch.sum(targets_oh * pert_outputs, 1)
             maxother_activ = torch.max(((1 - targets_oh) * pert_outputs - targets_oh * 1e4), 1)[0]
@@ -604,6 +619,7 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
             # update best attack found during optimization
             pert_predictions = torch.argmax(pert_outputs, dim=1)
             comp_pert_predictions = torch.argmax(compensate_confidence(pert_outputs, targets, targeted, confidence), dim=1)
+
             for i in range(batch_size):
                 norm = norms[i]
                 cppred = comp_pert_predictions[i]
@@ -612,9 +628,9 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
                 ax = adversaries[i]
                 if attack_successful(cppred, tlabel, targeted) and norm < epsilon:
                     assert cppred == ppred
-                    if norm < best_norm[i]:
-                        best_norm[i] = norm
-                        best_norm_ppred[i] = ppred
+                    # if norm < best_norm[i]:
+                    #     best_norm[i] = norm
+                    #     best_norm_ppred[i] = ppred
                     if norm < o_best_norm[i]:
                         o_best_norm[i] = norm
                         o_best_norm_ppred[i] = ppred
@@ -623,7 +639,9 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
         # binary search of `scale_const`
         for i in range(batch_size):
             tlabel = targets[i]
-            if best_norm_ppred[i] != -1:
+            if o_best_norm_ppred[i] != -1:
+            # if best_norm_ppred[i] != -1:
+                # print('attack successful')
                 # successful: attempt to lower `scale_const` by halving it
                 if scale_consts[i] < upper_bounds[i]:
                     upper_bounds[i] = scale_consts[i]
@@ -633,6 +651,7 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
                 if upper_bounds[i] < c_range[1] * 0.1:
                     scale_consts[i] = (lower_bounds[i] + upper_bounds[i]) / 2
             else:
+                # print('attack failed')
                 # failure: multiply `scale_const` by ten if no solution
                 # found; otherwise do binary search
                 if scale_consts[i] > lower_bounds[i]:
@@ -640,9 +659,9 @@ def cw_div4_attack(model, module, regularizer_weight, inputs, targets, device, t
                 if upper_bounds[i] < c_range[1] * 0.1:
                     scale_consts[i] = (lower_bounds[i] + upper_bounds[i]) / 2
                 else:
-                    scale_consts[i] *= 10
-                    
-    return o_best_adversaries #, norms
+                    scale_consts[i] *= 10  
+
+    return o_best_adversaries 
 
 # HELPER FUNCTIONS
 
@@ -701,7 +720,7 @@ def compensate_confidence(outputs, targets, targeted, confidence):
     :rtype: np.ndarray
     """
     outputs_comp = outputs.clone()
-    rng = torch.range(start=0, end=targets.shape[0]-1, dtype=torch.long)
+    rng = torch.arange(start=0, end=targets.shape[0], dtype=torch.long)
     # targets = targets.int()
     if targeted:
         # for each image $i$:
@@ -725,32 +744,6 @@ def attack_successful(prediction, target, targeted):
     else:
         return prediction != target
 
-# def norm_divergence_by_layername(data, model, layer, neuron=None, regularizer_weight=None):
-#     """
-#     returns the kld between the activations of the specified layer and a uniform pdf
-#     """
-#     # extract layer activations as numpy array
-#     layer_activations = torch.squeeze(model.extract_outputs(data=data, layer=layer))
-    
-#     # normalize over summation (to get a probability density)
-#     out_norm = torch.sum(layer_activations, 0)
-#     out_norm = out_norm / torch.sum(out_norm) + 1e-6 # F.softmax(out_norm, 1)
-
-#     # create uniform tensor
-#     uniform_tensor = torch.ones(out_norm.shape).to(device)
-
-#     # normalize over summation (to get a probability density)
-#     uni_norm = uniform_tensor / torch.sum(uniform_tensor)
-    
-#     # measure divergence between normalized layer activations and uniform distribution
-#     divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
-    
-#     # default regularizer if not provided
-#     if regularizer_weight is None:
-#         regularizer_weight = 0.005 
-    
-#     return regularizer_weight * divergence
-
 def extract_outputs(model, data, module):
     outputs = []      
     def hook(module, input, output):
@@ -760,48 +753,58 @@ def extract_outputs(model, data, module):
     handle.remove()
     return torch.stack(outputs)
 
-def norm_divergence_by_module(data, model, module, device, regularizer_weight=None):
+def norm_divergence_by_module(data, model, modules, device, regularizer_weight=None):
     """
     returns the kld between the activations of the specified layer and a uniform pdf
     """
+
+    if not isinstance(modules, list):
+        modules = list(modules)
+
     data = torch.clamp(data, 0, 1)
-    
-    # extract layer activations as numpy array
-    # NOTE: torch.relu is added just in case the layer is not actually ReLU'd beforehand
-    #       This is required for the summation and KL-Divergence calculation, otherwise nan
-    layer_activations = torch.relu(torch.squeeze(extract_outputs(model=model, data=data, module=module)))
-    
-    # normalize over summation (to get a probability density)
-    if len(layer_activations.size()) == 1:
-        out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
-    elif len(layer_activations.size()) == 2:
-        out_norm = torch.sum(layer_activations, 0)
-        out_norm = (out_norm / torch.sum(out_norm)) + 1e-20
-    else:
-        out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
 
-    # create uniform tensor
-    uniform_tensor = torch.ones(out_norm.shape).to(device)
+    total_divergence = 0
 
-    # normalize over summation (to get a probability density)
-    uni_norm = uniform_tensor / torch.sum(uniform_tensor)
+    for module in modules: 
     
-    # measure divergence between normalized layer activations and uniform distribution
-    # divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
-    divergence = F.kl_div(input=uni_norm.log(), target=out_norm, reduction='sum') 
-    
-    # default regularizer if not provided
-    if regularizer_weight is None:
-        regularizer_weight = 0.005 
+        # extract layer activations as numpy array
+        # NOTE: torch.relu is added just in case the layer is not actually ReLU'd beforehand
+        #       This is required for the summation and KL-Divergence calculation, otherwise nan
+        layer_activations = torch.relu(torch.squeeze(extract_outputs(model=model, data=data, module=module)))
         
-    if divergence < 0:
-        print(divergence, layer_activations, out_norm)
-        torch.save(data, 'data.pt')
-        torch.save(out_norm, 'out_norm.pt')
-        torch.save(uni_norm, 'uni_norm.pt')
-        return None
+        # normalize over summation (to get a probability density)
+        if len(layer_activations.size()) == 1:
+            out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
+        elif len(layer_activations.size()) == 2:
+            out_norm = torch.sum(layer_activations, 0)
+            out_norm = (out_norm / torch.sum(out_norm)) + 1e-20
+        else:
+            out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
+
+        # create uniform tensor
+        uniform_tensor = torch.ones(out_norm.shape).to(device)
+
+        # normalize over summation (to get a probability density)
+        uni_norm = uniform_tensor / torch.sum(uniform_tensor)
+        
+        # measure divergence between normalized layer activations and uniform distribution
+        # divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
+        divergence = F.kl_div(input=uni_norm.log(), target=out_norm, reduction='sum') 
+        
+        # default regularizer if not provided
+        if regularizer_weight is None:
+            regularizer_weight = 0.005 
+            
+        if divergence < 0:
+            print(divergence, layer_activations, out_norm)
+            torch.save(data, 'data.pt')
+            torch.save(out_norm, 'out_norm.pt')
+            torch.save(uni_norm, 'uni_norm.pt')
+            return None
+
+        total_divergence += divergence
     
-    return regularizer_weight * divergence
+    return regularizer_weight * total_divergence
 
 def eval_performance(model, originals, adversaries, targets):
     pert_output = model(adversaries)
@@ -871,3 +874,48 @@ def sample_3D_images(model, originals, adversaries, targets, classes, num_sample
 
     plt.tight_layout()
     plt.show()
+
+def generate_batch(dataset, num_per_class, device):
+    '''
+    creates a batch of inputs with a customizable number of instances for each class
+    dataset       : torchvision.dataset
+    num_per_class : iterable containing the desired counts of each class
+                    example: torch.ones(num_classes) * 100
+    '''
+    
+    def get_same_index(targets, label):
+        '''
+        Returns indices corresponding to the target label
+        which the dataloader uses to serve downstream.
+        '''
+        label_indices = []
+        for i in range(len(targets)):
+            if targets[i] == label:
+                label_indices.append(i)
+        return label_indices
+
+    data = []
+    labels = []
+    
+    num_classes = len(np.unique(dataset.targets))
+    
+    for i in range(num_classes):
+        
+        target_indices = get_same_index(dataset.targets, i)
+        class_batch_size = int(num_per_class[i])
+        
+        data_loader = torch.utils.data.DataLoader(dataset,
+            batch_size=class_batch_size, 
+            sampler=SubsetRandomSampler(target_indices),
+            shuffle=False,
+            pin_memory=True)
+
+        inputs, targets = next(iter(data_loader))
+
+        data.append(inputs)
+        labels.append(targets)
+
+    inputs = torch.cat(data, dim=0).to(device)
+    targets = torch.cat(labels, dim=0).to(device)
+    
+    return inputs, targets

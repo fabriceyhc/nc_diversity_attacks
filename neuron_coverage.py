@@ -4,16 +4,17 @@ import torch.nn as nn
 import numpy as np
 
 # provides a nice UI element when running in a notebook, otherwise use "import tqdm" only
-# from tqdm import tqdm_notebook as tqdm
-import tqdm
+from tqdm import tqdm_notebook as tqdm
+# from tqdm import tqdm
 
-def get_model_modules(model):
+def get_model_modules(model, layer_name=None):
     layer_dict = {}
     idx=0
     for name, module in model.named_children():
         module.cuda()
         if (not isinstance(module, nn.Sequential)
-            and not isinstance(module, nn.BatchNorm2d)):
+            and not isinstance(module, nn.BatchNorm2d)
+            and (layer_name is None or layer_name in name)):
             layer_dict[name + '-' + str(idx)] = module
             idx += 1
         else:
@@ -23,17 +24,18 @@ def get_model_modules(model):
                     module_3.cuda()
                     if (not isinstance(module_3, nn.Sequential)
                         and not isinstance(module_3, nn.BatchNorm2d)
-                        and 'shortcut' not in name_3):
+                        and 'shortcut' not in name_3
+                        and (layer_name is None or layer_name in name_3)):
                         layer_dict[name_3 + '-' + str(idx)] = module_3
                         idx += 1    
                         
     return layer_dict
 
-def get_layer_output_sizes(model, data):   
+def get_layer_output_sizes(model, data, layer_name=None):   
     output_sizes = {}
     hooks = []  
     
-    layer_dict = get_model_modules(model)
+    layer_dict = get_model_modules(model, layer_name)
  
     def hook(module, input, output):
         module_idx = len(output_sizes)
@@ -50,8 +52,8 @@ def get_layer_output_sizes(model, data):
             h.remove() 
     return output_sizes
 
-def get_init_dict(model, data, init_value=False): 
-    output_sizes = get_layer_output_sizes(model, data)       
+def get_init_dict(model, data, init_value=False, layer_name=None): 
+    output_sizes = get_layer_output_sizes(model, data, layer_name)       
     model_layer_dict = {}  
     for layer, output_size in output_sizes.items():
         for index in range(np.prod(output_size)):
@@ -59,9 +61,9 @@ def get_init_dict(model, data, init_value=False):
             model_layer_dict[(layer, index)] = init_value
     return model_layer_dict
 
-def neurons_covered(model_layer_dict):
-    covered_neurons = len([v for v in model_layer_dict.values() if v])
-    total_neurons = len(model_layer_dict)
+def neurons_covered(model_layer_dict, layer_name=None):
+    covered_neurons = len([v for k, v in model_layer_dict.items() if v and (layer_name is None or layer_name in k[0])])
+    total_neurons = len([v for k, v in model_layer_dict.items() if layer_name is None or layer_name in k[0]])
     return covered_neurons, total_neurons, covered_neurons / float(total_neurons)
 
 def scale(out, rmax=1, rmin=0):
@@ -81,8 +83,8 @@ def extract_outputs(model, data, module, force_relu=True):
     handle.remove()
     return torch.stack(outputs)
 
-def update_coverage(model, data, model_layer_dict, threshold=0.):   
-    layer_dict = get_model_modules(model) 
+def update_coverage(model, data, model_layer_dict, threshold=0., layer_name=None):   
+    layer_dict = get_model_modules(model, layer_name) 
     for layer, module in tqdm(layer_dict.items()): 
         outputs = torch.squeeze(torch.sum(extract_outputs(model, data, module), dim=1))
         scaled_outputs = scale(outputs)     
@@ -90,8 +92,26 @@ def update_coverage(model, data, model_layer_dict, threshold=0.):
             if out > threshold:
                 model_layer_dict[(layer, i)] = True
                 
-def eval_nc(model, data, threshold=0.):
+def eval_nc(model, data, threshold=0., layer_name=None):
     model_layer_dict = get_init_dict(model, data, False)
     update_coverage(model, data, model_layer_dict, threshold=threshold)
-    covered_neurons, total_neurons, neuron_coverage = neurons_covered(model_layer_dict)
+    covered_neurons, total_neurons, neuron_coverage = neurons_covered(model_layer_dict, layer_name)
     return covered_neurons, total_neurons, neuron_coverage
+
+
+# def layer_iterator(module, layer_dict={}, idx=0, layer_name=None):
+#     for name, module in module.named_children():
+#         print(name)
+#         if isinstance(module, nn.Sequential):
+#             return layer_iterator(module, layer_dict, idx, layer_name)
+#         else:
+#             if (not isinstance(module, nn.BatchNorm2d)
+#                 and 'shortcut' not in name
+#                 and (layer_name is None or layer_name in name)):
+#                 layer_dict[name + '-' + str(idx)] = module
+#                 idx += 1  
+#         if isinstance(module, BasicBlock):
+#             return layer_iterator(module, layer_dict, idx, layer_name)
+#     return layer_dict
+
+# layer_iterator(model, layer_name='conv')
