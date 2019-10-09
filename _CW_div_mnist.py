@@ -80,7 +80,7 @@ train_loader = torch.utils.data.DataLoader(
 
 # Generate a custom batch to ensure that each class is equally represented
 
-num_per_class = 30
+num_per_class = 10
 
 dataset = torchvision.datasets.MNIST(root=data_dir, 
                                      train=False, 

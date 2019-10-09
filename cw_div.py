@@ -12,8 +12,8 @@ import faulthandler
 faulthandler.enable()
 
 # provides a nice UI element when running in a notebook, otherwise use "import tqdm" only
-from tqdm import tqdm_notebook as tqdm
-# from tqdm import tqdm
+# from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm
 
 def cw_attack(model, inputs, targets, device, targeted=False, norm_type='inf',  
               epsilon=100., confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, 
@@ -563,7 +563,7 @@ def cw_div4_attack(model, modules, regularizer_weight, inputs, targets, device, 
         ae_tol = torch.tensor(1e-4).to(device) # abort early tolerance
 
         # optimization steps
-        for optim_step in tqdm(range(max_steps)):
+        for optim_step in range(max_steps):
 
             adversaries = from_tanh_space(inputs_tanh + pert_tanh)
             pert_outputs = model(adversaries)
@@ -759,7 +759,7 @@ def norm_divergence_by_module(data, model, modules, device, regularizer_weight=N
     """
 
     if not isinstance(modules, list):
-        modules = list(modules)
+        modules = [modules]
 
     data = torch.clamp(data, 0, 1)
 
@@ -788,19 +788,19 @@ def norm_divergence_by_module(data, model, modules, device, regularizer_weight=N
         uni_norm = uniform_tensor / torch.sum(uniform_tensor)
         
         # measure divergence between normalized layer activations and uniform distribution
-        # divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
-        divergence = F.kl_div(input=uni_norm.log(), target=out_norm, reduction='sum') 
+        divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
+        # divergence = F.kl_div(input=uni_norm.log(), target=out_norm, reduction='sum') 
         
         # default regularizer if not provided
         if regularizer_weight is None:
             regularizer_weight = 0.005 
             
         if divergence < 0:
-            print(divergence, layer_activations, out_norm)
-            torch.save(data, 'data.pt')
-            torch.save(out_norm, 'out_norm.pt')
-            torch.save(uni_norm, 'uni_norm.pt')
-            return None
+            print('The divergence was technically less than 0', divergence, layer_activations, out_norm)
+            torch.save(data, 'logs/data.pt')
+            torch.save(out_norm, 'logs/out_norm.pt')
+            torch.save(uni_norm, 'logs/uni_norm.pt')
+            # return None
 
         total_divergence += divergence
     
@@ -919,3 +919,21 @@ def generate_batch(dataset, num_per_class, device):
     targets = torch.cat(labels, dim=0).to(device)
     
     return inputs, targets
+
+def step_through_model(model, prefix=''):
+    for name, module in model.named_children():
+        path = '{}/{}'.format(prefix, name)
+        if (isinstance(module, nn.Conv1d)
+            or isinstance(module, nn.Conv2d)
+            or isinstance(module, nn.Linear)): # test for dataset
+            yield (path, name, module)
+        else:
+            yield from step_through_model(module, path)
+
+def get_model_layers(model):
+    layer_dict = {}
+    idx=1
+    for (path, name, module) in step_through_model(model):
+        layer_dict[path + '-' + str(idx)] = module
+        idx += 1
+    return layer_dict 

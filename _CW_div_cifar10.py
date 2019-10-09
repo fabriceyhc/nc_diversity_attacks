@@ -97,7 +97,7 @@ layer_dict = get_model_modules(model)
 def main():
 
     results = []
-    save_file_path = "assets/results_cifar10_2019.09.03_30_per_class.pkl"
+    save_file_path = "assets/results_cifar10_2019.09.04_30_per_class.pkl"
 
     # attack params
     search_steps=10
@@ -118,10 +118,9 @@ def main():
 
     n=11
     attack_versions = [cw_div4_attack] # [cw_div1_attack, cw_div2_attack, cw_div3_attack, cw_div4_attack]
-    target_layers = list(layer_dict)[0::n]
-    target_modules = [layer_dict[layer] for layer in target_layers]
-    reg_weights = [0, 1, 10, 100, 1000, 10000, 100000]
-    confidences = [10]# [0, 10, 20] # [15, 20, 25] # [0, 20, 40]
+    target_layers = [list(layer_dict)[55]]
+    reg_weights = [10000]
+    confidences = [10] # [0, 10, 20] # [15, 20, 25] # [0, 20, 40]
 
     # neuron coverage params
     nc_thresholds = 0. # all activations are scaled to (0,1) after relu
@@ -135,10 +134,10 @@ def main():
     # fréchet inception distance score (fid) params
     fid_batch_size = 64
     fid_cuda = use_cuda
-    real_path = "C:/temp_imgs/cifar/real_2019.09.03/"
-    fake_path = "C:/temp_imgs/cifar/fake_2019.09.03/"
+    real_path = "C:/temp_imgs/cifar/real_2019.09.04/"
+    fake_path = "C:/temp_imgs/cifar/fake_2019.09.04/"
 
-    with open('logs/error_log_2019.09.03.txt', 'w') as error_log: 
+    with open('logs/error_log_2019.09.04.txt', 'w') as error_log: 
 
         for attack in attack_versions:
             for layer_idx in target_layers:

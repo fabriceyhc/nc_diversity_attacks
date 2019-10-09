@@ -4,8 +4,8 @@ import torch.nn as nn
 import numpy as np
 
 # provides a nice UI element when running in a notebook, otherwise use "import tqdm" only
-from tqdm import tqdm_notebook as tqdm
-# from tqdm import tqdm
+# from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm
 
 def get_model_modules(model, layer_name=None):
     layer_dict = {}
@@ -14,6 +14,7 @@ def get_model_modules(model, layer_name=None):
         module.cuda()
         if (not isinstance(module, nn.Sequential)
             and not isinstance(module, nn.BatchNorm2d)
+            and not isinstance(module, nn.Dropout)
             and (layer_name is None or layer_name in name)):
             layer_dict[name + '-' + str(idx)] = module
             idx += 1
@@ -24,6 +25,7 @@ def get_model_modules(model, layer_name=None):
                     module_3.cuda()
                     if (not isinstance(module_3, nn.Sequential)
                         and not isinstance(module_3, nn.BatchNorm2d)
+                        and not isinstance(module, nn.Dropout)
                         and 'shortcut' not in name_3
                         and (layer_name is None or layer_name in name_3)):
                         layer_dict[name_3 + '-' + str(idx)] = module_3

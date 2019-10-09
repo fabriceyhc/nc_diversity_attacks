@@ -4,6 +4,10 @@ import torch.nn.functional as F
 
 import numpy as np
 
+import datetime
+import glob
+import os
+
 class DiversityModel(nn.Module):
     def __init__(self):
         super().__init__()
@@ -140,7 +144,7 @@ class DiversityModel(nn.Module):
         for h in self.hooks:
             h.remove()   
 
-class DenseNet(DiversityModel):
+class FCNet5(DiversityModel):
     def __init__(self):
         super().__init__()
         self.dens1 = nn.Linear(784, 256)
@@ -174,7 +178,71 @@ class DenseNet(DiversityModel):
         x = self.dens5(x)
         return F.log_softmax(x, dim=1)
 
-class ConvNet(DiversityModel):
+class FCNet10(DiversityModel):
+    def __init__(self):
+        super().__init__()
+        self.dens1 = nn.Linear(784, 698)
+        self.relu1 = nn.ReLU()
+        self.drop1 = nn.Dropout(0.2)
+        self.dens2 = nn.Linear(698, 612)
+        self.relu2 = nn.ReLU()
+        self.drop2 = nn.Dropout(0.2)
+        self.dens3 = nn.Linear(612, 526)
+        self.relu3 = nn.ReLU()
+        self.drop3 = nn.Dropout(0.2)
+        self.dens4 = nn.Linear(526, 440)
+        self.relu4 = nn.ReLU()
+        self.drop4 = nn.Dropout(0.2)
+        self.dens5 = nn.Linear(440, 354)
+        self.relu5 = nn.ReLU()
+        self.drop5 = nn.Dropout(0.2)
+        self.dens6 = nn.Linear(354, 268)
+        self.relu6 = nn.ReLU()
+        self.drop6 = nn.Dropout(0.2)
+        self.dens7 = nn.Linear(268, 182)
+        self.relu7 = nn.ReLU()
+        self.drop7 = nn.Dropout(0.2)
+        self.dens8 = nn.Linear(182, 96)
+        self.relu8 = nn.ReLU()
+        self.drop8 = nn.Dropout(0.2)
+        self.dens9 = nn.Linear(96, 20)
+        self.relu9 = nn.ReLU()
+        self.drop9 = nn.Dropout(0.2)
+        self.dens10 = nn.Linear(20, 10)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        x = self.dens1(x)
+        x = self.relu1(x)
+        x = self.drop1(x)
+        x = self.dens2(x)
+        x = self.relu2(x)
+        x = self.drop2(x)
+        x = self.dens3(x)
+        x = self.relu3(x)
+        x = self.drop3(x)
+        x = self.dens4(x)
+        x = self.relu4(x)
+        x = self.drop4(x)
+        x = self.dens5(x)
+        x = self.relu5(x)
+        x = self.drop5(x)
+        x = self.dens6(x)
+        x = self.relu6(x)
+        x = self.drop6(x)
+        x = self.dens7(x)
+        x = self.relu7(x)
+        x = self.drop7(x)
+        x = self.dens8(x)
+        x = self.relu8(x)
+        x = self.drop8(x)
+        x = self.dens9(x)
+        x = self.relu9(x)
+        x = self.drop9(x)
+        x = self.dens10(x)
+        return F.log_softmax(x, dim=1)
+
+class Conv2DNet(DiversityModel):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
@@ -198,17 +266,44 @@ class ConvNet(DiversityModel):
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
+# torch.nn.Conv1d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros')
+
+class Conv1DNet(DiversityModel):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv1d(1, 20, 5, 1)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv1d(20, 50, 5, 1)
+        self.relu2 = nn.ReLU()
+        self.dens1 = nn.Linear(193 * 50, 500)
+        self.relu3 = nn.ReLU()
+        self.dens2 = nn.Linear(500, 10)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1).unsqueeze(1)
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = F.max_pool1d(x, 2, 2)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = F.max_pool1d(x, 2, 2)
+        x = x.view(-1, 193 * 50)
+        x = self.dens1(x)
+        x = self.relu3(x)
+        x = self.dens2(x)
+        return F.log_softmax(x, dim=1)
+
 def train(model, device, train_loader, optimizer, epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
-        batch_size = len(data)
         optimizer.zero_grad()
         # calculate robust loss
         loss = F.cross_entropy(model(data), target)
         loss.backward()
         optimizer.step()
         if batch_idx % 100 == 0:
+            batch_size = len(data)
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                        100. * batch_idx / len(train_loader), loss.item()))
@@ -233,3 +328,20 @@ def test(model, device, test_loader):
 
 def get_dict_for_layer(dict, layer_name):
     return {k:v for k,v in dict.items() if layer_name in k[0]}
+
+def get_pretrained_weights(model, directory="pretrained_models/mnist/"):
+
+    latest_model = None
+    m_type = model.__class__.__name__
+    prev_models = glob.glob(directory+'*'+ m_type +'*.pth')
+    if prev_models:
+        latest_model = max(prev_models, key=os.path.getctime)
+
+    if (latest_model is not None 
+        and m_type in latest_model):  
+        print('loading model', latest_model)
+        model.load_state_dict(torch.load(latest_model))  
+    else:
+        print('no model found. train a new one.')
+
+    return model
