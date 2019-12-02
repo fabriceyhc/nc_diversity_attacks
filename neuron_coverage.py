@@ -33,11 +33,29 @@ def get_model_modules(model, layer_name=None):
                         
     return layer_dict
 
+def step_through_model(model, prefix=''):
+    for name, module in model.named_children():
+        path = '{}/{}'.format(prefix, name)
+        if (isinstance(module, nn.Conv1d)
+            or isinstance(module, nn.Conv2d)
+            or isinstance(module, nn.Linear)): # test for dataset
+            yield (path, name, module)
+        else:
+            yield from step_through_model(module, path)
+
+def get_model_layers(model):
+    layer_dict = {}
+    idx=1
+    for (path, name, module) in step_through_model(model):
+        layer_dict[path + '-' + str(idx)] = module
+        idx += 1
+    return layer_dict 
+
 def get_layer_output_sizes(model, data, layer_name=None):   
     output_sizes = {}
     hooks = []  
     
-    layer_dict = get_model_modules(model, layer_name)
+    layer_dict = get_model_layers(model)
  
     def hook(module, input, output):
         module_idx = len(output_sizes)
@@ -52,6 +70,7 @@ def get_layer_output_sizes(model, data, layer_name=None):
     finally:
         for h in hooks:
             h.remove() 
+            
     return output_sizes
 
 def get_init_dict(model, data, init_value=False, layer_name=None): 
@@ -86,7 +105,7 @@ def extract_outputs(model, data, module, force_relu=True):
     return torch.stack(outputs)
 
 def update_coverage(model, data, model_layer_dict, threshold=0., layer_name=None):   
-    layer_dict = get_model_modules(model, layer_name) 
+    layer_dict = get_model_layers(model) 
     for layer, module in tqdm(layer_dict.items()): 
         outputs = torch.squeeze(torch.sum(extract_outputs(model, data, module), dim=1))
         scaled_outputs = scale(outputs)     
