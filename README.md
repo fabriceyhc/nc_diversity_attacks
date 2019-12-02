@@ -18,8 +18,19 @@ The following steps should be sufficient to get these attacks up and running on 
 pip install -r requirements.txt
 ```
 
-### Execution
+### Attacks
+There are several versions of the CW Atttack that we experimented with, but ultimately decided upon `cw_div4_attack`. 
 
+| Version | Loss Function | Scaling Constant | Regularizer | Adversary Selection |
+| - | - | - | - | - |
+|  Baseline CW | CW |  True | L_p |  L_p |
+|  Diversity v1 | CW |  True | L_p, Batch Divergence | Instance Divergence |
+|  Diversity v2 | CW |  False | L_p, Batch Divergence | Instance Divergence |
+|  Diversity v3 | Cross Entropy |  False | L_p, Batch Divergence | Instance Divergence |
+|  Diversity v4 | CW |  True | L_p, Batch Divergence | L_p |
+|  PGD v1       | PGD | NA | L-inf | NA |
+
+### Execution
 To run the MNIST/CIFAR evaluation scripts:
 ```
 python _CW_div_mnist.py
