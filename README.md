@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ```
 
 ### Attacks
-There are several versions of the CW Atttack that we experimented with, but ultimately decided upon `cw_div4_attack`. We also use the PGD whitebox attack (PGD v1).
+There are several versions of the CW Atttack that we experimented with, but ultimately decided upon `cw_div4_attack` (Diversity v4). We also use the PGD whitebox attack (PGD v1).
 
 | Version | Loss Function | Scaling Constant | Regularizer | Adversary Selection |
 | - | - | - | - | - |
