@@ -1,7 +1,7 @@
 # diversity_attacks
 
 ### About
-Corresponding code to the paper "Is Neuron Coverage a Meaningful Measure for Testing Deep Neural Networks" by Fabrice *et al.*.
+Corresponding code to the paper "Is Neuron Coverage a Meaningful Measure for Testing Deep Neural Networks" by Fabrice Harel-Canada *et al.*.
 
 ### Pre-requisites
 The following steps should be sufficient to get these attacks up and running on most systems.
