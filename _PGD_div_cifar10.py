@@ -22,6 +22,7 @@ from div_attacks import *
 from neuron_coverage import *
 from inception_score import *
 from fid_score import *
+from utils import *
 
 # check if CUDA is available
 device = torch.device("cpu")
@@ -118,13 +119,7 @@ def main():
     fid_batch_size = 64
     fid_cuda = use_cuda
     real_path = "C:/temp_imgs/cifar/real_pgd_civar10/"
-    fake_path = "C:/temp_imgs/cifar/fake_pgd_civar10/"
-
-    # output diversity
-    num_classes = len(targets.unique())
-    max_diversity = torch.ones(num_classes) * (1./num_classes)
-    max_entropy = torch.distributions.Categorical(probs=max_diversity).entropy().item()
-    orig_classes, orig_counts = targets.unique(return_counts=True)                        
+    fake_path = "C:/temp_imgs/cifar/fake_pgd_civar10/"                     
 
     with open('logs/pgd_cifar10_error_log_2019.10.15.txt', 'w') as error_log: 
 
@@ -214,35 +209,22 @@ def main():
                                 fid_score_2048 = calculate_fid_given_paths(paths, fid_batch_size, fid_cuda, dims=2048)
                                 print('fid_score_2048:', fid_score_2048)
  
-                                # output diversity
+                                # output bias
                                 pert_output = model(adversaries)
-                                pert_pred = torch.argmax(pert_output, dim=1)
+                                y_pred = discretize(pert_output, dataset.boundaries).view(-1)
 
-                                class_counts = []
-                                for i in orig_classes:
-                                    count = 0
-                                    for pred in pert_pred:
-                                        if pred == i:
-                                            count += 1
-                                    class_counts.append(count)
-                                    
-                                class_counts = torch.tensor(class_counts, dtype=torch.float) 
-                                class_probs = class_counts / class_counts.sum()
-                                                
-                                output_div = torch.distributions.Categorical(probs=class_probs).entropy().item()
-                                print('output_div:', output_div)
+                                output_bias, y_pred_entropy, max_entropy = calculate_output_bias(classes, y_pred)
                                 
-                                output_diversity_pct = output_div / max_entropy
-                                print('output_diversity_pct:', output_diversity_pct)
-                                                               
                                 out = {'timestamp': timestamp, 
-                                       'attack': attack.__name__, 
+                                       'attack': attack.__name__,
+                                       'model': model_name, 
                                        'layer': layer_idx, 
                                        'regularization_weight': rw, 
                                        'epsilon': e, 
                                        'adversaries': adversaries,
                                        'pert_acc':pert_acc, 
                                        'orig_acc': orig_acc,
+                                       'attack_success_rate': attack_success_rate, 
                                        'neuron_coverage_000': neuron_coverage_000,
                                        'neuron_coverage_020': neuron_coverage_020,
                                        'neuron_coverage_050': neuron_coverage_050,
@@ -250,8 +232,7 @@ def main():
                                        'inception_score': mean_is,
                                        'fid_score_64': fid_score_64,
                                        'fid_score_2048': fid_score_2048,
-                                       'output_diversity': output_div,
-                                       'output_diversity_pct': output_diversity_pct}
+                                       'output_bias': output_bias}
                                 
                                 results.append(out)
                                 

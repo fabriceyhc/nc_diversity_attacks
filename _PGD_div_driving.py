@@ -7,6 +7,7 @@ import torch.optim as optim
 
 import torchvision
 import torchvision.transforms as transforms
+from torchvision.datasets import DatasetFolder, ImageFolder
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,89 +40,53 @@ if torch.cuda.is_available():
 else:
     print('CUDA is not available.')
 
-n_epochs = 10
-learning_rate = 0.01
-momentum = 0.5
-
 random_seed = 1
 torch.manual_seed(random_seed)
 
-#  torchvision.transforms.Normalize(
-#    (0.1307,), (0.3081,))
+data_dir = r'C:\data\udacity_self_driving_car'
+targets_file = 'targets.csv'
+batch_size = 32
 
-data_dir = "C:\data\MNIST"
-batch_size_train = 64
-batch_size_test = 100
+dataset = car_loader(target_csv_file=os.path.join(data_dir, targets_file),
+                    img_dir=os.path.join(data_dir, 'data'),
+                    device=device,
+                    num_classes=25,
+                    transform=transforms.Compose([transforms.ToTensor(),
+                                                  transforms.ToPILImage(),
+                                                  transforms.Resize((100,100)),
+                                                  transforms.ToTensor()]))
 
-train_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.MNIST(data_dir, train=True, download=True,
-                             transform=torchvision.transforms.Compose([
-                               torchvision.transforms.ToTensor()
-                             ])),
-    batch_size=batch_size_train, shuffle=True, pin_memory=True)
+test_loader = DataLoader(dataset, batch_size=batch_size)
 
-# test_loader = torch.utils.data.DataLoader(
-#     torchvision.datasets.MNIST(data_dir, train=False, download=True,
-#                          transform=torchvision.transforms.Compose([
-#                            torchvision.transforms.ToTensor()
-#                          ])),
-#     batch_size=batch_size_test, shuffle=False, pin_memory=True)
+# Generate a custom batch to ensure that each "class" of steering angles is equally represented
 
-
-# inputs, targets = next(iter(test_loader))
-# inputs = inputs.to(device)
-# targets = targets.to(device)
-
-# Generate a custom batch to ensure that each class is equally represented
-
-num_per_class = 10
-
-dataset = torchvision.datasets.MNIST(root=data_dir, 
-                                     train=False, 
-                                     download=True,
-                                     transform=transforms.Compose([
-                                         transforms.ToTensor()
-                                     ]))
-
-class_distribution = torch.ones(len(np.unique(dataset.targets))) * num_per_class
-inputs, targets = generate_batch(dataset, class_distribution, device)
+num_per_class = 4
+class_distribution = torch.ones(dataset.num_classes) * num_per_class
+inputs, targets, classes = generate_batch_reg(dataset, class_distribution, device)
 
 # # Load Pretrained Models if available
 
-## DenseNet5
-fcnet5 = FCNet5().to(device)
-fcnet5 = get_pretrained_weights(fcnet5) 
+## Dave_orig
+dave_o = Dave_orig().to(device)
+dave_o = get_pretrained_weights(dave_o, 'pretrained_models/driving/') 
 
-## DenseNet10
-fcnet10 = FCNet10().to(device) 
-fcnet10 = get_pretrained_weights(fcnet10)
-
-## Conv1DNet
-conv1dnet = Conv1DNet().to(device)
-conv1dnet = get_pretrained_weights(conv1dnet)
-
-## Conv2DNet
-conv2dnet = Conv2DNet().to(device)
-conv2dnet = get_pretrained_weights(conv2dnet)
+## Dave_norminit
+dave_n = Dave_norminit().to(device)
+dave_n = get_pretrained_weights(dave_n, 'pretrained_models/driving/') 
 
 # # Attack Time
 def main():
 
-    models = [fcnet5, fcnet10, conv1dnet, conv2dnet]
+    models = [dave_o, dave_n]
 
     # attack params
     epsilon = 100.
-    num_steps = 10
+    num_steps = 20
     step_size = 0.01
     log_frequency = 100
 
-    mean = (0.1307,) # the mean used in inputs normalization
-    std = (0.3081,) # the standard deviation used in inputs normalization
-    box = (min((0 - m) / s for m, s in zip(mean, std)),
-           max((1 - m) / s for m, s in zip(mean, std)))
-
-    ### the following weight should change
-    attack_versions = [pgd_attack]
+    # primary evaluation criteria
+    attack_versions = [pgd_attack_reg]
     reg_weights = [0, 1, 10, 100, 1000, 10000, 100000, 1000000]
     epsilons = [0.1, 0.2, 0.3]
 
@@ -135,22 +100,37 @@ def main():
     is_splits = 10
 
     # fréchet inception distance score (fid) params
-    real_path = "C:/temp_imgs/mnist/real_pgd_mnist/"
-    fake_path = "C:/temp_imgs/mnist/fake_pgd_mnist/"
+    real_path = "C:/temp_imgs/mnist/real_pgd_driving/"
+    fake_path = "C:/temp_imgs/mnist/fake_pgd_driving/"
     fid_batch_size = 64
-    fid_cuda = use_cuda                  
+    fid_cuda = use_cuda                   
 
-    with open('logs/pgd_mnist_error_log_2019.10.15.txt', 'w') as error_log: 
+    with open('logs/pgd_mnist_error_log_2020.02.10.txt', 'w') as error_log: 
 
         for model in models:
 
             results = []
             model_name = model.__class__.__name__
-            save_file_path = "assets/pgd_results_mnist_" + model_name + "_2019.10.15.pkl"   
+            save_file_path = "assets/pgd_results_driving_" + model_name + "_2020.02.10.pkl"   
 
-            init = {'desc': 'Initial inputs and targets', 
-                    'inputs': inputs, 
-                    'targets': targets}
+            # neuron coverage
+            covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)
+            print('neuron_coverage_000:', neuron_coverage_000)
+            covered_neurons, total_neurons, neuron_coverage_020 = eval_nc(model, inputs, 0.20)
+            print('neuron_coverage_020:', neuron_coverage_020)
+            covered_neurons, total_neurons, neuron_coverage_050 = eval_nc(model, inputs, 0.50)
+            print('neuron_coverage_050:', neuron_coverage_050)
+            covered_neurons, total_neurons, neuron_coverage_075 = eval_nc(model, inputs, 0.75)
+            print('neuron_coverage_075:', neuron_coverage_075)
+
+            init = {'desc': 'Initial inputs, targets, classes', 
+                    'inputs': inputs,
+                    'targets': targets,
+                    'classes': classes,
+                    'neuron_coverage_000': neuron_coverage_000,
+                    'neuron_coverage_020': neuron_coverage_020,
+                    'neuron_coverage_050': neuron_coverage_050,
+                    'neuron_coverage_075': neuron_coverage_075}
             
             results.append(init) 
 
@@ -168,7 +148,8 @@ def main():
                             
                                 timestamp = str(datetime.datetime.now()).replace(':','.')
                                 
-                                attack_detail = ['timestamp', timestamp, 
+                                attack_detail = ['model', model_name,
+                                                 'timestamp', timestamp, 
                                                  'attack', attack.__name__, 
                                                  'layer: ', layer_idx, 
                                                  'regularization_weight: ', rw, 
@@ -178,23 +159,25 @@ def main():
      
                                 # adversarial attack 
                                 
-                                adversaries = attack(model, 
-                                                     module, 
-                                                     rw, 
-                                                     inputs, 
-                                                     targets, 
-                                                     device, 
-                                                     epsilon=e,
-                                                     num_steps=num_steps,
-                                                     step_size=step_size,
-                                                     log_frequency=log_frequency)
+                                orig_err, pgd_err, adversaries = attack(model, 
+                                                                        module, 
+                                                                        rw, 
+                                                                        inputs,
+                                                                        targets, 
+                                                                        device, 
+                                                                        epsilon=e,
+                                                                        num_steps=num_steps,
+                                                                        step_size=step_size,
+                                                                        log_frequency=log_frequency)
                                
                                 # evaluate adversary effectiveness
-                                pert_acc, orig_acc = eval_performance(model, inputs, adversaries, targets)
-                                # sample_1D_images(model, inputs, adversaries, targets)
+                                mse, pert_acc, orig_acc = eval_performance_reg(model, inputs, adversaries, targets, classes, dataset)
+                                # sample_3D_images_reg(model, inputs, adversaries, targets, classes, dataset)
                                 
                                 pert_acc = pert_acc.item() / 100.
                                 orig_acc = orig_acc.item() / 100.
+
+                                attack_success_rate = 1 - pert_acc
                                 
                                 # neuron coverage
                                 covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, adversaries, 0.00)
@@ -207,7 +190,7 @@ def main():
                                 print('neuron_coverage_075:', neuron_coverage_075)
                                 
                                 # inception score
-                                preprocessed_advs = preprocess_1D_imgs(adversaries)
+                                preprocessed_advs = preprocess_3D_imgs(adversaries)
                                 mean_is, std_is = inception_score(preprocessed_advs, is_cuda, is_batch_size, is_resize, is_splits)
                                 print('inception_score:', mean_is)
                                 

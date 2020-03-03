@@ -15,6 +15,7 @@ def get_model_modules(model, layer_name=None):
         if (not isinstance(module, nn.Sequential)
             and not isinstance(module, nn.BatchNorm2d)
             and not isinstance(module, nn.Dropout)
+            and not isinstance(module, nn.ReLU)
             and (layer_name is None or layer_name in name)):
             layer_dict[name + '-' + str(idx)] = module
             idx += 1
@@ -26,6 +27,7 @@ def get_model_modules(model, layer_name=None):
                     if (not isinstance(module_3, nn.Sequential)
                         and not isinstance(module_3, nn.BatchNorm2d)
                         and not isinstance(module, nn.Dropout)
+                        and not isinstance(module, nn.ReLU)
                         and 'shortcut' not in name_3
                         and (layer_name is None or layer_name in name_3)):
                         layer_dict[name_3 + '-' + str(idx)] = module_3
@@ -43,12 +45,15 @@ def step_through_model(model, prefix=''):
         else:
             yield from step_through_model(module, path)
 
-def get_model_layers(model):
+def get_model_layers(model, cross_section_size=0):
     layer_dict = {}
-    idx=1
+    i = 0
     for (path, name, module) in step_through_model(model):
-        layer_dict[path + '-' + str(idx)] = module
-        idx += 1
+        layer_dict[str(i) + path] = module
+        i += 1
+    if cross_section_size > 0:
+        target_layers = list(layer_dict)[0::cross_section_size] 
+        layer_dict = { target_layer: layer_dict[target_layer] for target_layer in target_layers }
     return layer_dict 
 
 def get_layer_output_sizes(model, data, layer_name=None):   

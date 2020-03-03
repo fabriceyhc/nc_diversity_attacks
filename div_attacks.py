@@ -2,12 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.autograd import Variable
 
 import numpy as np
-
-import matplotlib.pyplot as plt
 
 import faulthandler
 faulthandler.enable()
@@ -15,6 +12,8 @@ faulthandler.enable()
 # provides a nice UI element when running in a notebook, otherwise use "import tqdm" only
 # from tqdm import tqdm_notebook as tqdm
 from tqdm import tqdm
+
+from utils import *
 
 # ============================================================================================== #
 # ============================================================================================== #
@@ -672,6 +671,167 @@ def cw_div4_attack(model, modules, regularizer_weight, inputs, targets, device, 
 
     return o_best_adversaries 
 
+
+def cw_div_reg_attack(model, modules, regularizer_weight, inputs, targets, dataset, device, targeted=False, norm_type='inf', epsilon=100., 
+                      confidence=0.0, c_range=(1e-3, 1e10), search_steps=5, max_steps=1000, 
+                      abort_early=True, box=(-1., 1.), optimizer_lr=1e-2, 
+                      init_rand=False, log_frequency=10):
+
+    inputs = inputs.to(device)
+    targets = targets.to(device)
+    model.to(device)
+    
+    classes = torch.unsqueeze(discretize(targets, dataset.boundaries), dim=1)
+    
+    batch_size = inputs.size(0)
+    num_classes = dataset.num_classes
+       
+    orig_outputs = model(inputs)
+    orig_classes = discretize(orig_outputs, dataset.boundaries)  
+
+    # `lower_bounds`, `upper_bounds` and `scale_consts` are used
+    # for binary search of each `scale_const` in the batch. The element-wise
+    # inquality holds: lower_bounds < scale_consts <= upper_bounds
+    lower_bounds = torch.zeros(batch_size).to(device) 
+    upper_bounds = torch.ones(batch_size).to(device) * c_range[1]
+    scale_consts = torch.ones(batch_size).to(device) * c_range[0]
+
+    # Optimal attack to be found.
+    # The three "placeholders" are defined as:
+    # - `o_best_norm`        : the smallest norms encountered so far
+    # - `o_best_norm_ppred`  : the perturbed predictions made by the adversarial perturbations with the smallest norms
+    # - `o_best_adversaries` : the underlying adversarial example of `o_best_norm_ppred`
+    o_best_norm = torch.ones(batch_size).to(device) * 1e10
+    o_best_norm_ppred = torch.ones(batch_size).to(device) * -1.
+    o_best_adversaries = inputs.clone()
+
+    # convert `inputs` to tanh-space
+    inputs_tanh = to_tanh_space(inputs)
+
+    # the perturbation tensor (only one we need to track gradients on)
+    pert_tanh = torch.zeros(inputs.size(), device=device, requires_grad=True)
+
+    optimizer = optim.Adam([pert_tanh], lr=optimizer_lr)
+
+    for const_step in range(1, search_steps+1):
+
+        print('Step:', const_step)
+        print('Scale Consts: \n', scale_consts)
+
+        # previous (summed) batch loss, to be used in early stopping policy
+        prev_batch_loss = torch.tensor(1e10).to(device)
+        ae_tol = torch.tensor(1e-4).to(device) # abort early tolerance
+
+        # optimization steps
+        for optim_step in range(max_steps):
+
+            adversaries = from_tanh_space(inputs_tanh + pert_tanh)
+            pert_outputs = model(adversaries)
+            pert_classes = discretize(pert_outputs, dataset.boundaries)  
+            
+            # nll_loss
+            
+            f = torch.abs(targets - pert_outputs) + confidence
+            # f = F.mse_loss(targets, pert_outputs)
+            cw_loss = torch.sum(scale_consts * f)
+            
+            # # cw loss
+            # target_activ = torch.sum(targets_oh * pert_outputs, 1)
+            # maxother_activ = torch.max(((1 - targets_oh) * pert_outputs - targets_oh * 1e4), 1)[0]
+            
+            # if targeted:           
+            #     # if targeted, optimize to make `target_activ` larger than `maxother_activ` by `confidence`
+            #     f = torch.clamp(maxother_activ - target_activ + confidence, min=0.0)
+            # else:
+            #     # if not targeted, optimize to make `maxother_activ` larger than `target_activ` (the ground truth image labels) by `confidence`
+            #     f = torch.clamp(target_activ - maxother_activ + confidence, min=0.0)
+            
+            # cw_loss = torch.sum(scale_consts * f)
+            
+            # norm loss
+            if norm_type == 'inf':
+                inf_norms = torch.norm(adversaries - inputs, p=float("inf"), dim=(1,2,3))
+                norms = inf_norms
+            elif norm_type == 'l2':
+                l2_norms = torch.pow(adversaries - inputs, exponent=2)
+                l2_norms = torch.sum(l2_norms.view(l2_norms.size(0), -1), 1)
+                norms = l2_norms
+            else:
+                raise Exception('must provide a valid norm_type for epsilon distance constraint: inf, l2') 
+                         
+            norm_loss = torch.sum(norms)
+            
+            # diversity loss
+            div_reg = 0
+            if regularizer_weight > 0:
+                div_reg = norm_divergence_by_module(data=adversaries, model=model, modules=modules, device=device, regularizer_weight=regularizer_weight)
+  
+            batch_loss = cw_loss + norm_loss + div_reg
+
+            # Do optimization for one step
+            optimizer.zero_grad()
+            batch_loss.backward()
+            optimizer.step()
+
+            # "returns" batch_loss, pert_norms, pert_outputs, adversaries
+
+            if optim_step % log_frequency == 0: 
+                print('batch [%i] \t batch_loss: %.4f cw_loss: %.4f norm_loss: %.4f div_reg: %.4f' % (optim_step, batch_loss, cw_loss, norm_loss, div_reg))
+                # print(o_best_norm)
+
+            if abort_early and not optim_step % (max_steps // 10):
+                if batch_loss > prev_batch_loss * (1 - ae_tol):
+                    break
+                if batch_loss == 0:
+                    break
+                prev_batch_loss = batch_loss
+
+            # update best attack found during optimization  
+            for i in range(batch_size):
+                norm = norms[i]
+                actual_class = classes[i]
+                orig_class = orig_classes[i]
+                pert_class = pert_classes[i]
+                advx = adversaries[i]
+                if ((orig_class != pert_class or orig_class == actual_class)
+                    and attack_successful(pert_class, actual_class, targeted) 
+                    and norm < epsilon 
+                    and norm < o_best_norm[i]):
+                    o_best_norm[i] = norm
+                    o_best_norm_ppred[i] = pert_class
+                    o_best_adversaries[i] = advx
+
+        # binary search of `scale_const`
+        if const_step == max_steps:
+            print("last step, binary search updates unnecessary...")
+            break
+            
+        for i in range(batch_size):
+            if o_best_norm_ppred[i] != -1:
+            # if best_norm_ppred[i] != -1:
+                # successful: attempt to lower `scale_const` by halving it
+                if scale_consts[i] < upper_bounds[i]:
+                    upper_bounds[i] = scale_consts[i]
+                # `upper_bounds[i] == c_range[1]` implies no solution
+                # found, i.e. upper_bounds[i] has never been updated by
+                # scale_consts[i] until `scale_consts[i] > 0.1 * c_range[1]`
+                if upper_bounds[i] < c_range[1] * 0.1:
+                    scale_consts[i] = (lower_bounds[i] + upper_bounds[i]) / 2
+            else:
+                # failure: multiply `scale_const` by ten if no solution
+                # found; otherwise do binary search
+                if scale_consts[i] > lower_bounds[i]:
+                    lower_bounds[i] = scale_consts[i]
+                if upper_bounds[i] < c_range[1] * 0.1:
+                    scale_consts[i] = (lower_bounds[i] + upper_bounds[i]) / 2
+                else:
+                    scale_consts[i] *= 10  
+                    
+        new_adversaries = torch.where(o_best_norm_ppred != -1)[0].shape[0]
+        print('total number of generated adversaries: %i' % (new_adversaries))
+
+    return o_best_adversaries 
+
 # =============================================================================================== #
 # =============================================================================================== #
 # =============================================================================================== #
@@ -695,30 +855,9 @@ def pgd_attack(model,
     targets = targets.to(device)
     model.to(device)
     X, y = Variable(inputs, requires_grad=True), Variable(targets)
-    err_natural, err_robust,X_pgd = _pgd_whitebox(model, 
-                                                  modules, 
-                                                  regularizer_weight, 
-                                                  X, 
-                                                  y, 
-                                                  epsilon,
-                                                  num_steps=num_steps,
-                                                  step_size=step_size,
-                                                  device=device)
-
-    return X_pgd
-
-def _pgd_whitebox(model,
-                  modules,
-                  regularizer_weight,
-                  X,
-                  y,
-                  epsilon=None,
-                  num_steps=None,
-                  step_size=None,
-                  device=None):
 
     out = model(X)
-    err = (out.data.max(1)[1] != y.data).float().sum()
+    orig_err = (out.data.max(1)[1] != y.data).float().sum()
     X_pgd = Variable(X.data, requires_grad=True)
     random_noise = torch.FloatTensor(*X_pgd.shape).uniform_(-epsilon, epsilon).to(device)
     X_pgd = Variable(X_pgd.data + random_noise, requires_grad=True)
@@ -739,9 +878,9 @@ def _pgd_whitebox(model,
         eta = torch.clamp(X_pgd.data - X.data, -epsilon, epsilon)
         X_pgd = Variable(X.data + eta, requires_grad=True)
         X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
-    err_pgd = (model(X_pgd).data.max(1)[1] != y.data).float().sum()
-    print('err pgd (white-box): ', err_pgd)
-    return err, err_pgd, X_pgd
+    pgd_err = (model(X_pgd).data.max(1)[1] != y.data).float().sum()
+    print('err pgd (white-box): ', pgd_err)
+    return orig_err, pgd_err, X_pgd
 
 def pgd_attack_reg(model, 
                    modules, 
@@ -758,30 +897,9 @@ def pgd_attack_reg(model,
     targets = targets.to(device)
     model.to(device)
     X, y = Variable(inputs, requires_grad=True), Variable(targets)
-    err_natural, err_robust,X_pgd = _pgd_whitebox_reg(model, 
-                                                      modules, 
-                                                      regularizer_weight, 
-                                                      X, 
-                                                      y, 
-                                                      epsilon,
-                                                      num_steps=num_steps,
-                                                      step_size=step_size,
-                                                      device=device)
-
-    return X_pgd
-
-def _pgd_whitebox_reg(model,
-                      modules,
-                      regularizer_weight,
-                      X,
-                      y,
-                      epsilon=None,
-                      num_steps=None,
-                      step_size=None,
-                      device=None):
 
     out = model(X).view(-1)
-    err = torch.nn.functional.mse_loss(out, y) # (out.data.max(1)[1] != y.data).float().sum()
+    orig_err = torch.nn.functional.mse_loss(out, y) # (out.data.max(1)[1] != y.data).float().sum()
     X_pgd = Variable(X.data, requires_grad=True)
     random_noise = torch.FloatTensor(*X_pgd.shape).uniform_(-epsilon, epsilon).to(device)
     X_pgd = Variable(X_pgd.data + random_noise, requires_grad=True)
@@ -802,9 +920,9 @@ def _pgd_whitebox_reg(model,
         eta = torch.clamp(X_pgd.data - X.data, -epsilon, epsilon)
         X_pgd = Variable(X.data + eta, requires_grad=True)
         X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
-    err_pgd = torch.nn.functional.mse_loss(model(X_pgd).view(-1), y) # (model(X_pgd).data.max(1)[1] != y.data).float().sum()
-    print('err pgd (white-box): ', err_pgd)
-    return err, err_pgd, X_pgd
+    pgd_err = torch.nn.functional.mse_loss(model(X_pgd).view(-1), y) # (model(X_pgd).data.max(1)[1] != y.data).float().sum()
+    print('err pgd (white-box): ', pgd_err)
+    return orig_err, pgd_err, X_pgd
 
 # ==================================================================================================== #
 # ==================================================================================================== #
@@ -813,13 +931,6 @@ def _pgd_whitebox_reg(model,
 # ==================================================================================================== #
 # ==================================================================================================== #
 # ==================================================================================================== #
-
-# https://github.com/pytorch/pytorch/issues/7284
-def discretize(tensor, boundaries):
-    result = torch.zeros_like(tensor, dtype=torch.int32)
-    for boundary in boundaries:
-        result += (tensor > boundary).int()
-    return result
 
 def atanh(x, eps=1e-2):
     """
@@ -899,196 +1010,3 @@ def attack_successful(prediction, target, targeted):
         return prediction == target
     else:
         return prediction != target
-
-def extract_outputs(model, data, module):
-    outputs = []      
-    def hook(module, input, output):
-        outputs.append(output)    
-    handle = module.register_forward_hook(hook)     
-    model(data)
-    handle.remove()
-    return torch.stack(outputs)
-
-def norm_divergence_by_module(data, model, modules, device, regularizer_weight=None):
-    """
-    returns the kld between the activations of the specified layer and a uniform pdf
-    """
-
-    if not isinstance(modules, list):
-        modules = [modules]
-
-    data = torch.clamp(data, 0, 1)
-
-    total_divergence = 0
-
-    for module in modules: 
-    
-        # extract layer activations as numpy array
-        # NOTE: torch.relu is added just in case the layer is not actually ReLU'd beforehand
-        #       This is required for the summation and KL-Divergence calculation, otherwise nan
-        layer_activations = torch.relu(torch.squeeze(extract_outputs(model=model, data=data, module=module)))
-        
-        # normalize over summation (to get a probability density)
-        if len(layer_activations.size()) == 1:
-            out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
-        elif len(layer_activations.size()) == 2:
-            out_norm = torch.sum(layer_activations, 0)
-            out_norm = (out_norm / torch.sum(out_norm)) + 1e-20
-        else:
-            out_norm = (layer_activations / torch.sum(layer_activations)) + 1e-20 
-
-        # create uniform tensor
-        uniform_tensor = torch.ones(out_norm.shape).to(device)
-
-        # normalize over summation (to get a probability density)
-        uni_norm = uniform_tensor / torch.sum(uniform_tensor)
-        
-        # measure divergence between normalized layer activations and uniform distribution
-        divergence = F.kl_div(input=out_norm.log(), target=uni_norm, reduction='sum')
-        # divergence = F.kl_div(input=uni_norm.log(), target=out_norm, reduction='sum') 
-        
-        # default regularizer if not provided
-        if regularizer_weight is None:
-            regularizer_weight = 0.005 
-            
-        if divergence < 0:
-            print('The divergence was technically less than 0', divergence, layer_activations, out_norm)
-            torch.save(data, 'logs/data.pt')
-            torch.save(out_norm, 'logs/out_norm.pt')
-            torch.save(uni_norm, 'logs/uni_norm.pt')
-            # return None
-
-        total_divergence += divergence
-    
-    return regularizer_weight * total_divergence
-
-def eval_performance(model, originals, adversaries, targets):
-    pert_output = model(adversaries)
-    orig_output = model(originals)
-
-    pert_pred = torch.argmax(pert_output, dim=1)
-    orig_pred = torch.argmax(orig_output, dim=1)
-
-    pert_correct = pert_pred.eq(targets.data).sum()
-    orig_correct = orig_pred.eq(targets.data).sum()
-
-    pert_acc = 100. * pert_correct / len(targets)
-    orig_acc = 100. * orig_correct / len(targets)
-
-    print('Perturbed Accuracy: {}/{} ({:.0f}%)'.format(pert_correct, len(targets), pert_acc))
-    print('Original Accuracy: {}/{} ({:.0f}%)'.format(orig_correct, len(targets), orig_acc))
-    
-    return pert_acc, orig_acc
-
-def sample_1D_images(model, originals, adversaries, targets, num_samples = 5):
-    orig_inputs = originals.cpu().detach().numpy()
-    adv_examples = adversaries.cpu().detach().numpy()
-    pert_output = model(adversaries)
-    orig_output = model(originals)
-    pert_pred = torch.argmax(pert_output, dim=1)
-    orig_pred = torch.argmax(orig_output, dim=1)
-    plt.figure(figsize=(15,8))
-    for i in range(1, num_samples+1):
-        plt.subplot(2, num_samples, i)
-        plt.imshow(np.squeeze(orig_inputs[i]), cmap='gray')  
-        plt.title('true: {}'.format(targets[i].item()))
-        plt.xticks([])
-        plt.yticks([])
-
-        plt.subplot(2, num_samples, num_samples+i)
-        plt.imshow(np.squeeze(adv_examples[i]), cmap='gray')
-        plt.title('adv_pred: {} - orig_pred: {}'.format(pert_pred[i].item(), orig_pred[i].item()))
-        plt.xticks([])
-        plt.yticks([])
-
-    plt.tight_layout()
-    plt.show()
-
-def sample_3D_images(model, originals, adversaries, targets, classes, num_samples = 5):
-    orig_inputs = originals.cpu().detach().numpy()
-    adv_examples = adversaries.cpu().detach().numpy()
-    pert_output = model(adversaries)
-    orig_output = model(originals)
-    pert_pred = torch.argmax(pert_output, dim=1)
-    orig_pred = torch.argmax(orig_output, dim=1)
-    plt.figure(figsize=(15,8))
-    for i in range(1, num_samples+1):
-        plt.subplot(2, num_samples, i)
-        plt.imshow(np.transpose(np.squeeze(orig_inputs[i]), (1, 2, 0)))  
-        true_idx = targets[i].item()
-        plt.title('true: {}'.format(classes[true_idx]))
-        plt.xticks([])
-        plt.yticks([])
-
-        plt.subplot(2, num_samples, num_samples+i)
-        plt.imshow(np.transpose(np.squeeze(adv_examples[i]), (1, 2, 0)))  
-        pred_idx = pert_pred[i].item()
-        orig_idx = orig_pred[i].item()
-        plt.title('adv_pred: {} - orig_pred: {}'.format(classes[pred_idx], classes[orig_idx]))
-        plt.xticks([])
-        plt.yticks([])
-
-    plt.tight_layout()
-    plt.show()
-
-def generate_batch(dataset, num_per_class, device):
-    '''
-    creates a batch of inputs with a customizable number of instances for each class
-    dataset       : torchvision.dataset
-    num_per_class : iterable containing the desired counts of each class
-                    example: torch.ones(num_classes) * 100
-    '''
-    
-    def get_same_index(targets, label):
-        '''
-        Returns indices corresponding to the target label
-        which the dataloader uses to serve downstream.
-        '''
-        label_indices = []
-        for i in range(len(targets)):
-            if targets[i] == label:
-                label_indices.append(i)
-        return label_indices
-
-    data = []
-    labels = []
-    
-    num_classes = len(np.unique(dataset.targets))
-    
-    for i in range(num_classes):
-        
-        target_indices = get_same_index(dataset.targets, i)
-        class_batch_size = int(num_per_class[i])
-        
-        data_loader = torch.utils.data.DataLoader(dataset,
-            batch_size=class_batch_size, 
-            sampler=SubsetRandomSampler(target_indices),
-            shuffle=False)
-
-        inputs, targets = next(iter(data_loader))
-
-        data.append(inputs)
-        labels.append(targets)
-
-    inputs = torch.cat(data, dim=0).to(device)
-    targets = torch.cat(labels, dim=0).to(device)
-    
-    return inputs, targets
-
-def step_through_model(model, prefix=''):
-    for name, module in model.named_children():
-        path = '{}/{}'.format(prefix, name)
-        if (isinstance(module, nn.Conv1d)
-            or isinstance(module, nn.Conv2d)
-            or isinstance(module, nn.Linear)): # test for dataset
-            yield (path, name, module)
-        else:
-            yield from step_through_model(module, path)
-
-def get_model_layers(model):
-    layer_dict = {}
-    idx=1
-    for (path, name, module) in step_through_model(model):
-        layer_dict[path + '-' + str(idx)] = module
-        idx += 1
-    return layer_dict 
