@@ -3,6 +3,5 @@ pandas
 matplotlib
 tqdm
 scipy
-
-# type hints
+jupyter
 typing

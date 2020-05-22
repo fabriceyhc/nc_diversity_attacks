@@ -143,7 +143,6 @@ def main():
                                 print(*attack_detail, sep=' ')
      
                                 # adversarial attack 
-                                
                                 adversaries = attack(model, 
                                                      module, 
                                                      rw, 
@@ -161,6 +160,8 @@ def main():
                                 
                                 pert_acc = pert_acc.item() / 100.
                                 orig_acc = orig_acc.item() / 100.
+
+                                attack_success_rate = 1 - pert_acc
                                 
                                 # neuron coverage
                                 covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, adversaries, 0.00)
@@ -194,11 +195,11 @@ def main():
                                 fid_score_2048 = calculate_fid_given_paths(paths, fid_batch_size, fid_cuda, dims=2048)
                                 print('fid_score_2048:', fid_score_2048)
 
-                                # output bias
+                                # output impoartiality
                                 pert_output = model(adversaries)
                                 y_pred = discretize(pert_output, dataset.boundaries).view(-1)
 
-                                output_bias, y_pred_entropy, max_entropy = calculate_output_bias(classes, y_pred)
+                                output_impartiality, y_pred_entropy, max_entropy = calculate_output_impartiality(classes, y_pred)
                                 
                                 out = {'timestamp': timestamp, 
                                        'attack': attack.__name__,
@@ -217,7 +218,7 @@ def main():
                                        'inception_score': mean_is,
                                        'fid_score_64': fid_score_64,
                                        'fid_score_2048': fid_score_2048,
-                                       'output_bias': output_bias}
+                                       'output_impartiality': output_impartiality}
                                 
                                 results.append(out)
                             

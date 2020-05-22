@@ -29,11 +29,11 @@ There are several versions of the CW Atttack that we experimented with, but ulti
 
 | Version | Loss Function | Scaling Constant | Regularizer | Adversary Selection |
 | - | - | - | - | - |
-|  Baseline CW | CW |  True | L_p |  L_p |
-|  Diversity v1 | CW |  True | L_p, Batch Divergence | Instance Divergence |
-|  Diversity v2 | CW |  False | L_p, Batch Divergence | Instance Divergence |
-|  Diversity v3 | Cross Entropy |  False | L_p, Batch Divergence | Instance Divergence |
-|  Diversity v4 | CW |  True | L_p, Batch Divergence | L_p |
+|  Baseline CW | CW |  True | L2/L-inf |  L2/L-inf |
+|  Diversity v1 | CW |  True | L2/L-inf , Batch Divergence | Instance Divergence |
+|  Diversity v2 | CW |  False | L2/L-inf , Batch Divergence | Instance Divergence |
+|  Diversity v3 | Cross Entropy |  False | L2/L-inf, Batch Divergence | Instance Divergence |
+|  Diversity v4 | CW |  True | L2/L-inf, Batch Divergence | L2/L-inf |
 |  PGD v1       | PGD | NA | L-inf | NA |
 
 ### Execution

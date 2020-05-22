@@ -42,7 +42,7 @@ def convert_to_categorical(regression_labels, num_labels=25):
     bins = np.linspace(min_val - 1e-5, max_val + 1e-5, num_labels)
     return np.digitize(regression_labels, bins)
 
-def calculate_output_bias(y_true, y_pred): 
+def calculate_output_impartiality(y_true, y_pred): 
     num_classes = len(y_true.unique())
     orig_classes, orig_counts = y_true.unique(return_counts=True) 
     
@@ -65,7 +65,8 @@ def calculate_output_bias(y_true, y_pred):
     y_pred_entropy = torch.distributions.Categorical(probs=class_probs).entropy().item()
     
     output_bias = (max_entropy - y_pred_entropy) / max_entropy
-    return output_bias, y_pred_entropy, max_entropy
+    output_impartiality = 1 - output_bias
+    return output_impartiality, y_pred_entropy, max_entropy
 
 def extract_outputs(model, data, module):
     outputs = []      
