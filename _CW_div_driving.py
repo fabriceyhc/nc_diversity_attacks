@@ -221,8 +221,8 @@ def main():
                                 # output impoartiality
                                 pert_output = model(adversaries)
                                 y_pred = discretize(pert_output, dataset.boundaries).view(-1)
-
                                 output_impartiality, y_pred_entropy, max_entropy = calculate_output_impartiality(classes, y_pred)
+                                print('output_impartiality:', output_impartiality)
                                 
                                 out = {'timestamp': timestamp, 
                                        'attack': attack.__name__,

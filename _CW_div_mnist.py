@@ -132,10 +132,25 @@ def main():
                 model_name = model.__class__.__name__
                 save_file_path = "assets/cw_results_mnist_" + model_name + "_2019.10.15.pkl"   
 
-                init = {'desc': 'Initial inputs and targets', 
-                        'inputs': inputs, 
-                        'targets': targets}
-                
+                # neuron coverage
+                covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)
+                print('neuron_coverage_000:', neuron_coverage_000)
+                covered_neurons, total_neurons, neuron_coverage_020 = eval_nc(model, inputs, 0.20)
+                print('neuron_coverage_020:', neuron_coverage_020)
+                covered_neurons, total_neurons, neuron_coverage_050 = eval_nc(model, inputs, 0.50)
+                print('neuron_coverage_050:', neuron_coverage_050)
+                covered_neurons, total_neurons, neuron_coverage_075 = eval_nc(model, inputs, 0.75)
+                print('neuron_coverage_075:', neuron_coverage_075)
+
+                init = {'desc': 'Initial inputs, targets, classes', 
+                        'inputs': inputs,
+                        'targets': targets,
+                        'classes': 'NA',
+                        'neuron_coverage_000': neuron_coverage_000,
+                        'neuron_coverage_020': neuron_coverage_020,
+                        'neuron_coverage_050': neuron_coverage_050,
+                        'neuron_coverage_075': neuron_coverage_075}
+
                 results.append(init) 
 
                 n=2 # skip relu layers
@@ -207,10 +222,10 @@ def main():
 
                                 # output impoartiality
                                 pert_output = model(adversaries)
-                                y_pred = discretize(pert_output, dataset.boundaries).view(-1)
+                                y_pred = torch.argmax(pert_output, dim=1)
+                                output_impartiality, y_pred_entropy, max_entropy = calculate_output_impartiality(targets, y_pred)
+                                print('output_impartiality:', output_impartiality)
 
-                                output_impartiality, y_pred_entropy, max_entropy = calculate_output_impartiality(classes, y_pred)
-                                
                                 out = {'timestamp': timestamp, 
                                        'attack': attack.__name__,
                                        'model': model_name, 
