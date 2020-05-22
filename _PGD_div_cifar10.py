@@ -34,29 +34,18 @@ if torch.cuda.is_available():
 else:
     print('CUDA is not available.')
 
-data_dir = "C:\data\CIFAR10"
-batch_size_test = 100
+random_seed = 1
+torch.manual_seed(random_seed)
 
+data_dir = "C:\data\CIFAR10"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
-    
-# normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                                  std=[0.229, 0.224, 0.225])
-
-# test_loader = torch.utils.data.DataLoader(
-#     torchvision.datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transforms.Compose([
-#         # normalize,
-#         transforms.ToTensor()    
-#     ])),
-#     batch_size=batch_size_test, shuffle=False, pin_memory=True)
 
 classes = ['plane', 'car', 'bird', 'cat', 'deer', 
            'dog', 'frog', 'horse', 'ship', 'truck']
 
 # Generate a custom batch to ensure that each class is equally represented
-
 num_per_class = 10
-
 dataset = torchvision.datasets.CIFAR10(root=data_dir, 
                                        train=False, 
                                        download=True,
@@ -89,18 +78,12 @@ densenet121 = densenet121().cuda()
 def main():
 
     models = [resnet56, densenet121]
-    num_layers = 5 # the number of layers we want to sample from the network, evenly spaced
+    num_layers = 5 # the number of layers between which we want to sample, evenly spaced
 
     # attack params
-    epsilon = 100.
     num_steps = 1000
     step_size = 0.01
     log_frequency = 100
-
-    mean = (0.485, 0.456, 0.406) # the mean used in inputs normalization
-    std = (0.229, 0.224, 0.225) # the standard deviation used in inputs normalization
-    box = (min((0 - m) / s for m, s in zip(mean, std)),
-           max((1 - m) / s for m, s in zip(mean, std)))
 
     attack_versions = [pgd_attack]
     reg_weights = [0, 1, 10, 100, 1000, 10000, 100000, 1000000]
@@ -248,7 +231,6 @@ def main():
                             finally:
 
                                 pass
-
 
 if __name__ == '__main__':
     try:

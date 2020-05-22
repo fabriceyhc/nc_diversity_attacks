@@ -59,7 +59,6 @@ dataset = car_loader(target_csv_file=os.path.join(data_dir, targets_file),
 test_loader = DataLoader(dataset, batch_size=batch_size)
 
 # Generate a custom batch to ensure that each "class" of steering angles is equally represented
-
 num_per_class = 4
 class_distribution = torch.ones(dataset.num_classes) * num_per_class
 inputs, targets, classes = generate_batch_reg(dataset, class_distribution, device)
@@ -259,7 +258,6 @@ def main():
                             finally:
 
                                 pass
-
 
 if __name__ == '__main__':
     try:

@@ -39,45 +39,17 @@ if torch.cuda.is_available():
 else:
     print('CUDA is not available.')
 
-n_epochs = 10
-learning_rate = 0.01
-momentum = 0.5
-
 random_seed = 1
 torch.manual_seed(random_seed)
 
-#  torchvision.transforms.Normalize(
-#    (0.1307,), (0.3081,))
-
 data_dir = "C:\data\MNIST"
-batch_size_train = 64
-batch_size_test = 100
-
-train_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.MNIST(data_dir, train=True, download=True,
-                             transform=torchvision.transforms.Compose([
-                               torchvision.transforms.ToTensor()
-                             ])),
-    batch_size=batch_size_train, shuffle=True, pin_memory=True)
-
-# test_loader = torch.utils.data.DataLoader(
-#     torchvision.datasets.MNIST(data_dir, train=False, download=True,
-#                          transform=torchvision.transforms.Compose([
-#                            torchvision.transforms.ToTensor()
-#                          ])),
-#     batch_size=batch_size_test, shuffle=False, pin_memory=True)
-
-
-# inputs, targets = next(iter(test_loader))
-# inputs = inputs.to(device)
-# targets = targets.to(device)
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
 
 # Generate a custom batch to ensure that each class is equally represented
-
 num_per_class = 10
-
 dataset = torchvision.datasets.MNIST(root=data_dir, 
-                                     train=False, 
+                                     train=False,
                                      download=True,
                                      transform=transforms.Compose([
                                          transforms.ToTensor()
@@ -115,12 +87,6 @@ def main():
     step_size = 0.01
     log_frequency = 100
 
-    mean = (0.1307,) # the mean used in inputs normalization
-    std = (0.3081,) # the standard deviation used in inputs normalization
-    box = (min((0 - m) / s for m, s in zip(mean, std)),
-           max((1 - m) / s for m, s in zip(mean, std)))
-
-    ### the following weight should change
     attack_versions = [pgd_attack]
     reg_weights = [0, 1, 10, 100, 1000, 10000, 100000, 1000000]
     epsilons = [0.1, 0.2, 0.3]
@@ -267,7 +233,6 @@ def main():
                             finally:
 
                                 pass
-
 
 if __name__ == '__main__':
     try:

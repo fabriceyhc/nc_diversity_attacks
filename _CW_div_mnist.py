@@ -50,32 +50,9 @@ torch.manual_seed(random_seed)
 #    (0.1307,), (0.3081,))
 
 data_dir = "C:\data\MNIST"
-batch_size_train = 64
-batch_size_test = 100
-
-train_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.MNIST(data_dir, train=True, download=True,
-                             transform=torchvision.transforms.Compose([
-                               torchvision.transforms.ToTensor()
-                             ])),
-    batch_size=batch_size_train, shuffle=True, pin_memory=True)
-
-# test_loader = torch.utils.data.DataLoader(
-#     torchvision.datasets.MNIST(data_dir, train=False, download=True,
-#                          transform=torchvision.transforms.Compose([
-#                            torchvision.transforms.ToTensor()
-#                          ])),
-#     batch_size=batch_size_test, shuffle=False, pin_memory=True)
-
-
-# inputs, targets = next(iter(test_loader))
-# inputs = inputs.to(device)
-# targets = targets.to(device)
 
 # Generate a custom batch to ensure that each class is equally represented
-
 num_per_class = 10
-
 dataset = torchvision.datasets.MNIST(root=data_dir, 
                                      train=False, 
                                      download=True,
