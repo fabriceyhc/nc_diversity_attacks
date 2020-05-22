@@ -3,5 +3,5 @@ pandas
 matplotlib
 tqdm
 scipy
-jupyter
+faulthandler
 typing

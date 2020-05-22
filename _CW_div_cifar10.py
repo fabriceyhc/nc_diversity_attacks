@@ -110,7 +110,7 @@ def main():
     is_resize = True
     is_splits = 10
 
-    # fréchet inception distance score (fid) params
+    # frechet inception distance score (fid) params
     fid_batch_size = 64
     fid_cuda = use_cuda
     real_path = "C:/temp_imgs/cifar/real_cw_cifar10/"

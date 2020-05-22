@@ -98,7 +98,7 @@ def main():
     is_resize = True
     is_splits = 10
 
-    # fréchet inception distance score (fid) params
+    # frechet inception distance score (fid) params
     real_path = "C:/temp_imgs/mnist/real_pgd_driving/"
     fake_path = "C:/temp_imgs/mnist/fake_pgd_driving/"
     fid_batch_size = 64
