@@ -388,22 +388,22 @@ def get_model_layers(model):
 def get_dict_for_layer(dict, layer_name):
     return {k:v for k,v in dict.items() if layer_name in k[0]}
 
-def get_pretrained_weights(model, directory="pretrained_models/mnist/"):
-
+def get_pretrained_weights(model, device, directory="pretrained_models/mnist/", get_any=False):
     latest_model = None
-    m_type = model.__class__.__name__
-    prev_models = glob.glob(directory+'*'+ m_type +'*.*')
+    if get_any:
+        prev_models = glob.glob(directory+'*.*')
+    else:
+        m_type = model.__class__.__name__
+        prev_models = glob.glob(directory+'*'+ m_type +'*.*')
     if prev_models:
         latest_model = max(prev_models, key=os.path.getctime)
-
-    if (latest_model is not None 
-        and m_type in latest_model):  
+    if (latest_model is not None):  
         print('loading model', latest_model)
-        model.load_state_dict(torch.load(latest_model))  
+        model.load_state_dict(torch.load(latest_model, map_location=device))  
+        return model
     else:
         print('no model found. train a new one.')
-
-    return model
+        return False
 
 # =============================================================================================== #
 # =============================================================================================== #
