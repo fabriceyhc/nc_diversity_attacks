@@ -4,23 +4,20 @@
 Corresponding code to the paper "Is Neuron Coverage a Meaningful Measure for Testing Deep Neural Networks" by Fabrice Harel-Canada *et al.*.
 
 ### Pre-requisites
-The following steps should be sufficient to get these attacks up and running on most systems.
-```
-pip install torch===1.5.0 torchvision===0.6.0 -f https://download.pytorch.org/whl/torch_stable.html
-
-#or 
-
-conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
-```
+The following steps should be sufficient to get these attacks up and running on most systems running Python 3.7.3.
 
 ```
-# numpy
-# pandas
-# matplotlib
-# tqdm
-# scipy
-# typing
+numpy==1.16.2
+pandas==0.24.2
+torchvision==0.6.0
+torch==1.5.0
+tqdm==4.31.1
+matplotlib==3.0.3
+scipy==1.2.1
+```
+Note: these are the most recent versions of each library used, lower versions may be acceptable as well. 
 
+```
 pip install -r requirements.txt
 ```
 
@@ -37,7 +34,7 @@ There are several versions of the CW Atttack that we experimented with, but ulti
 |  PGD v1       | PGD | NA | L-inf | NA |
 
 ### Execution
-To run the MNIST/CIFAR/Driving evaluation scripts:
+To run the evaluation scripts:
 ```
 # CW
 python _CW_div_mnist.py
