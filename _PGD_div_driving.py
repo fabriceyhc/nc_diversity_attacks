@@ -67,11 +67,11 @@ inputs, targets, classes = generate_batch_reg(dataset, class_distribution, devic
 
 ## Dave_orig
 dave_o = Dave_orig().to(device)
-dave_o = get_pretrained_weights(dave_o, 'pretrained_models/driving/') 
+dave_o = get_pretrained_weights(dave_o, device, 'pretrained_models/driving/') 
 
 ## Dave_norminit
 dave_n = Dave_norminit().to(device)
-dave_n = get_pretrained_weights(dave_n, 'pretrained_models/driving/') 
+dave_n = get_pretrained_weights(dave_n, device, 'pretrained_models/driving/') 
 
 # # Attack Time
 def main():

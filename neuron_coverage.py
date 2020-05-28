@@ -11,7 +11,6 @@ def get_model_modules(model, layer_name=None):
     layer_dict = {}
     idx=0
     for name, module in model.named_children():
-        module.cuda()
         if (not isinstance(module, nn.Sequential)
             and not isinstance(module, nn.BatchNorm2d)
             and not isinstance(module, nn.Dropout)
@@ -21,9 +20,7 @@ def get_model_modules(model, layer_name=None):
             idx += 1
         else:
             for name_2, module_2 in module.named_children():
-                module_2.cuda()
                 for name_3, module_3 in module_2.named_children():
-                    module_3.cuda()
                     if (not isinstance(module_3, nn.Sequential)
                         and not isinstance(module_3, nn.BatchNorm2d)
                         and not isinstance(module, nn.Dropout)

@@ -62,7 +62,7 @@ inputs, targets = generate_batch(dataset, class_distribution, device)
 from resnet import *
 models_dir = 'pretrained_models/cifar10/' 
 resnet56 = resnet56().to(device)
-state_dict = torch.load(models_dir + 'resnet56.th', map_location='cuda')['state_dict'] # best_prec1, state_dict
+state_dict = torch.load(models_dir + 'resnet56.th', map_location=device)['state_dict'] # best_prec1, state_dict
 new_state_dict = {}
 for k, v in state_dict.items():
     if 'module' in k:
@@ -72,7 +72,7 @@ resnet56.load_state_dict(new_state_dict)
 
 # DenseNet121 - https://github.com/huyvnphan/PyTorch-CIFAR10
 from densenet import *
-densenet121 = densenet121().cuda()
+densenet121 = densenet121().to(device)
                     
 # # Attack Time
 def main():

@@ -85,7 +85,6 @@ def get_activations(files, model, batch_size=50, dims=2048,
        activations of the given tensor when feeding inception with the
        query tensor.
     """
-    # print("starting get_activations()...")
 
     model.eval()
 
@@ -154,8 +153,6 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     --   : The Frechet Distance.
     """
 
-    # print("starting calculate_frechet_distance()...")
-
     mu1 = np.atleast_1d(mu1)
     mu2 = np.atleast_1d(mu2)
 
@@ -211,8 +208,6 @@ def calculate_activation_statistics(files, model, batch_size=64,
                the inception model.
     """
 
-    print("starting calculate_activation_statistics()...")
-
     act = get_activations(files, model, batch_size, dims, cuda, verbose)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
@@ -220,8 +215,6 @@ def calculate_activation_statistics(files, model, batch_size=64,
 
 
 def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
-
-    # print("starting _compute_statistics_of_path()...")
 
     if path.endswith('.npz'):
         f = np.load(path)
@@ -238,8 +231,6 @@ def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
 
 def calculate_fid_given_paths(paths, batch_size, cuda, dims):
     """Calculates the FID of two paths"""
-
-    # print("starting calculate_fid_given_paths()...")
     
     for p in paths:
         if not os.path.exists(p):

@@ -67,19 +67,19 @@ inputs, targets = generate_batch(dataset, class_distribution, device)
 
 ## DenseNet5
 fcnet5 = FCNet5().to(device)
-fcnet5 = get_pretrained_weights(fcnet5) 
+fcnet5 = get_pretrained_weights(fcnet5, device) 
 
 ## DenseNet10
 fcnet10 = FCNet10().to(device) 
-fcnet10 = get_pretrained_weights(fcnet10)
+fcnet10 = get_pretrained_weights(fcnet10, device)
 
 ## Conv1DNet
 conv1dnet = Conv1DNet().to(device)
-conv1dnet = get_pretrained_weights(conv1dnet)
+conv1dnet = get_pretrained_weights(conv1dnet, device)
 
 ## Conv2DNet
 conv2dnet = Conv2DNet().to(device)
-conv2dnet = get_pretrained_weights(conv2dnet)
+conv2dnet = get_pretrained_weights(conv2dnet, device)
 
 # # Attack Time
 def main():
