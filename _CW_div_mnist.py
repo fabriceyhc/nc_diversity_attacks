@@ -39,17 +39,15 @@ if torch.cuda.is_available():
 else:
     print('CUDA is not available.')
 
-n_epochs = 10
-learning_rate = 0.01
-momentum = 0.5
-
 random_seed = 1
 torch.manual_seed(random_seed)
+
+date = datetime.date.today()
 
 #  torchvision.transforms.Normalize(
 #    (0.1307,), (0.3081,))
 
-data_dir = "C:\data\MNIST"
+data_dir = "data"
 
 # Generate a custom batch to ensure that each class is equally represented
 num_per_class = 10
@@ -117,12 +115,12 @@ def main():
     is_splits = 10
 
     # frechet inception distance score (fid) params
-    real_path = "C:/temp_imgs/mnist/real_cw_mnist/"
-    fake_path = "C:/temp_imgs/mnist/fake_cw_mnist/"
+    real_path = "temp_imgs/mnist/real_cw_mnist/"
+    fake_path = "temp_imgs/mnist/fake_cw_mnist/"
     fid_batch_size = 64
     fid_cuda = use_cuda                      
 
-    with open('logs/cw_mnist_error_log_2019.10.15.txt', 'w') as error_log: 
+    with open('logs/cw_mnist_error_log_' + str(date) + '.txt', 'w') as error_log: 
 
         for model in models:
 
@@ -130,7 +128,7 @@ def main():
 
                 results = []
                 model_name = model.__class__.__name__
-                save_file_path = "assets/cw_results_mnist_" + model_name + "_2019.10.15.pkl"   
+                save_file_path = 'assets/cw_results_mnist_' + model_name + '_' + str(date) + '.pkl'   
 
                 # neuron coverage
                 covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)

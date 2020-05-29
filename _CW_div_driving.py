@@ -43,7 +43,9 @@ else:
 random_seed = 1
 torch.manual_seed(random_seed)
 
-data_dir = r'C:\data\udacity_self_driving_car'
+date = datetime.date.today()
+
+data_dir = r'data\udacity_self_driving_car'
 targets_file = 'targets.csv'
 batch_size = 32
 
@@ -99,18 +101,18 @@ def main():
     is_splits = 10
 
     # frechet inception distance score (fid) params
-    real_path = "C:/temp_imgs/mnist/real_pgd_driving/"
-    fake_path = "C:/temp_imgs/mnist/fake_pgd_driving/"
+    real_path = "temp_imgs/mnist/real_cw_driving/"
+    fake_path = "temp_imgs/mnist/fake_cw_driving/"
     fid_batch_size = 64
     fid_cuda = use_cuda                   
 
-    with open('logs/pgd_mnist_error_log_2020.02.10.txt', 'w') as error_log: 
+    with open('logs/cw_mnist_error_log_' + str(date) + '.txt', 'w') as error_log: 
 
         for model in models:
 
             results = []
             model_name = model.__class__.__name__
-            save_file_path = "assets/pgd_results_driving_" + model_name + "_2020.02.10.pkl"   
+            save_file_path = 'assets/cw_results_driving_' + model_name + '_' + str(date) + '.pkl'   
 
             # neuron coverage
             covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)

@@ -4,6 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 
+device = torch.device("cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+
 __all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet161']
 
 class _DenseLayer(nn.Sequential):
@@ -125,7 +129,7 @@ def _densenet(arch, growth_rate, block_config, num_init_features, pretrained, pr
     return model
 
 
-def densenet121(pretrained=True, progress=True, device='cuda', **kwargs):
+def densenet121(pretrained=True, progress=True, device=device, **kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 
@@ -137,7 +141,7 @@ def densenet121(pretrained=True, progress=True, device='cuda', **kwargs):
                      **kwargs)
 
 
-def densenet161(pretrained=True, progress=True, device='cuda', **kwargs):
+def densenet161(pretrained=True, progress=True, device=device, **kwargs):
     r"""Densenet-161 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 
@@ -149,7 +153,7 @@ def densenet161(pretrained=True, progress=True, device='cuda', **kwargs):
                      **kwargs)
 
 
-def densenet169(pretrained=True, progress=True, device='cuda', **kwargs):
+def densenet169(pretrained=True, progress=True, device=device, **kwargs):
     r"""Densenet-169 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 
@@ -161,7 +165,7 @@ def densenet169(pretrained=True, progress=True, device='cuda', **kwargs):
                      **kwargs)
 
 
-def densenet201(pretrained=True, progress=True, device='cuda', **kwargs):
+def densenet201(pretrained=True, progress=True, device=device, **kwargs):
     r"""Densenet-201 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 

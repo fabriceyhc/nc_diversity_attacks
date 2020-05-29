@@ -42,7 +42,9 @@ else:
 random_seed = 1
 torch.manual_seed(random_seed)
 
-data_dir = "C:\data\MNIST"
+date = datetime.date.today()
+
+data_dir = "data"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 
@@ -101,18 +103,18 @@ def main():
     is_splits = 10
 
     # frechet inception distance score (fid) params
-    real_path = "C:/temp_imgs/mnist/real_pgd_mnist/"
-    fake_path = "C:/temp_imgs/mnist/fake_pgd_mnist/"
+    real_path = "temp_imgs/mnist/real_pgd_mnist/"
+    fake_path = "temp_imgs/mnist/fake_pgd_mnist/"
     fid_batch_size = 64
     fid_cuda = use_cuda                  
 
-    with open('logs/pgd_mnist_error_log_2019.10.15.txt', 'w') as error_log: 
+    with open('logs/pgd_mnist_error_log_' + str(date) + '.txt', 'w') as error_log: 
 
         for model in models:
 
             results = []
             model_name = model.__class__.__name__
-            save_file_path = "assets/pgd_results_mnist_" + model_name + "_2019.10.15.pkl"   
+            save_file_path = 'assets/pgd_results_mnist_' + model_name + '_' + str(date) + '.pkl'   
 
             # neuron coverage
             covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)

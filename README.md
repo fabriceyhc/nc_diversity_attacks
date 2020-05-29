@@ -21,6 +21,9 @@ Note: these are the most recent versions of each library used, lower versions ma
 pip install -r requirements.txt
 ```
 
+### Data
+MNIST and CIFAR10 data are downloaded automatically when running an evaluation script. The Driving data comes from the Udacity [self-driving-car](https://github.com/udacity/self-driving-car) challenge and is included in the `data` folder. 
+
 ### Attacks
 There are several versions of the CW Atttack that we experimented with, but ultimately decided upon `cw_div4_attack` (Diversity v4). We also use the PGD whitebox attack (PGD v1).
 
@@ -45,4 +48,14 @@ python _CW_div_driving.py
 python _PGD_div_mnist.py
 python _PGD_div_cifar10.py
 python _PGD_div_driving.py
+```
+
+### Jupyter Notebook
+The results are agregated and visualized in a jupyter notebook:
+```
+# install
+pip install jupyter
+
+# start notebook in working directory
+jupyter notebook
 ```

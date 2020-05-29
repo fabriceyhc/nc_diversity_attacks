@@ -37,7 +37,9 @@ else:
 random_seed = 1
 torch.manual_seed(random_seed)
 
-data_dir = "C:\data\CIFAR10"
+date = datetime.date.today()
+
+data_dir = "data"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 
@@ -101,16 +103,16 @@ def main():
     # frechet inception distance score (fid) params
     fid_batch_size = 64
     fid_cuda = use_cuda
-    real_path = "C:/temp_imgs/cifar/real_pgd_civar10/"
-    fake_path = "C:/temp_imgs/cifar/fake_pgd_civar10/"                     
+    real_path = "temp_imgs/cifar/real_pgd_civar10/"
+    fake_path = "temp_imgs/cifar/fake_pgd_civar10/"                     
 
-    with open('logs/pgd_cifar10_error_log_2019.10.15.txt', 'w') as error_log: 
+    with open('logs/pgd_cifar10_error_log_' + str(date) + '.txt', 'w') as error_log: 
 
         for model in models:
 
             results = []
             model_name = model.__class__.__name__
-            save_file_path = "assets/pgd_results_cifar10_" + model_name + "_2019.10.15.pkl"    
+            save_file_path = 'assets/pgd_results_cifar10_' + model_name + '_' + str(date) + '.pkl'    
 
             # neuron coverage
             covered_neurons, total_neurons, neuron_coverage_000 = eval_nc(model, inputs, 0.00)
