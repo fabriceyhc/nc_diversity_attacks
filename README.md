@@ -51,7 +51,7 @@ python _PGD_div_driving.py
 ```
 
 ### Jupyter Notebook
-The results are agregated and visualized in a jupyter notebook:
+The results are agregated and visualized in a jupyter notebook, which can be viewed directly in GitHub or perused locally:
 ```
 # install
 pip install jupyter
