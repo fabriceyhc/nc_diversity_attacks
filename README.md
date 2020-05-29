@@ -4,7 +4,7 @@
 Corresponding code to the paper "Is Neuron Coverage a Meaningful Measure for Testing Deep Neural Networks" by Fabrice Harel-Canada *et al.*.
 
 ### Pre-requisites
-The following steps should be sufficient to get these attacks up and running on most systems running Python 3.7.3.
+The following steps should be sufficient to get these attacks up and running on most systems running Python 3.7.3+.
 
 ```
 numpy==1.16.2
@@ -15,7 +15,7 @@ tqdm==4.31.1
 matplotlib==3.0.3
 scipy==1.2.1
 ```
-Note: these are the most recent versions of each library used, lower versions may be acceptable as well. 
+Note: these are the most recent versions of each library used, lower versions may be acceptable as well. It is also *highly* recommended that you use GPUs to execute the evaluation scripts. 
 
 ```
 pip install -r requirements.txt
