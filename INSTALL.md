@@ -14,7 +14,7 @@ tqdm==4.31.1
 matplotlib==3.0.3
 scipy==1.2.1
 ```
-Note: these are the most recent versions of each library used, lower versions may be acceptable as well. It is also *highly* recommended that you use GPUs to execute the evaluation scripts. 
+Note: these are the most recent versions of each library used, lower versions may be acceptable as well. It is also *highly* recommended that you use GPUs to execute the evaluation scripts. If you have access to GPUs, [download](https://pytorch.org/get-started/locally/) the appropriate version of PyTorch for your system instead of using the default above. 
 
 ```
 pip install -r requirements.txt
@@ -22,11 +22,10 @@ pip install -r requirements.txt
 
 ## VM Instructions
 
-1. Download and install VMWare Workstation Pro
-	- [Download](https://www.vmware.com/products/workstation-pro/workstation-pro-evaluation.html)
-	- Note: There is a free trial period so you don't have to pay for anything if the committee does not have a license.
+1. [Download](https://www.vmware.com/products/workstation-pro/workstation-pro-evaluation.html) and install VMWare Workstation Pro
+	- NOTE: There is a free trial period so you don't have to pay for anything.
 2. Download and unzip the OVF files containing the nc_diversity_attacks VM [here](coming soon)
-	- NOTE: The OVF file is ~ 8.8GB.
+	- NOTE: The OVF file contains an Ubuntu 20.04 VM and is ~ 8.8GB.
 3. Import the VM 
 	- Follow instructions [here](https://pubs.vmware.com/workstation-9/index.jsp?topic=%2Fcom.vmware.ws.using.doc%2FGUID-DDCBE9C0-0EC9-4D09-8042-18436DA62F7A.html) or watch YouTube instructions [here](https://youtu.be/WY11A-eyJWY?t=94) (recommended)
 4. The password is `password`.
